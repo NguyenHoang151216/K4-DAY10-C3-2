@@ -41,11 +41,26 @@
 
 ---
 
+## 📌 GIAI ĐOẠN CP5 & CP6: Corrupted/Repaired Collections & Final 3-State Demo
+
+### 1. Build Corrupted Collection (`papers-corrupted`)
+- **Execution:** Chạy `script/run_cp5_corrupted.py` tạo file `papers_clean_corrupted.csv` (49 bản ghi, áp dụng 6 toán tử corruption với seed=42) và log `corruption_log.json`.
+- **Chroma Count:** Collection `papers-corrupted` được khởi tạo thành công với 49 docs.
+- **Baseline Protection:** Kiểm chứng collection `papers-baseline` nguyên vẹn 100% (48 docs, không bị mutate).
+
+### 2. Build Repaired Collection (`papers-repaired`) & Final 3-State Demo
+- **Execution:** Chạy `script/run_cp6_repaired.py` phát lại raw records snapshot `crossref_records.json` phục hồi file `papers_clean_repaired.csv` (48 bản ghi).
+- **Chroma Count:** Collection `papers-repaired` được khởi tạo với 48 docs.
+- **UI Tier 1 Dashboard:** Cập nhật `docs/dashboard.html` hoàn chỉnh.
+- **CLI Tier 2 Compare Demo:** Script `script/run_compare_demo.py` sẵn sàng chạy so sánh trực tiếp 3 collection (`papers-baseline`, `papers-corrupted`, `papers-repaired`).
+
+---
+
 ## 📅 Nhật ký Checkpoint
 - [x] **CP0 (00:00 - 00:30):** Khởi tạo nhánh, nghiên cứu contract `src/retrieval/`, phác thảo khung `src/presentation/dashboard.py` và chuẩn bị tệp nhật ký R4.
 - [x] **CP1 (00:30 - 01:05):** Đã khởi tạo script `script/inspect_clean_data.py` để tự động kiểm tra 16 cột contract & 5 mẫu `text_for_embedding`. Đã hoàn thiện layout HTML Dashboard trong `src/presentation/dashboard.py` và sinh thử file `docs/dashboard.html`.
 - [x] **CP2 (01:05 - 01:35):** Build `papers-baseline` Chroma index thành công qua `script/run_cp2_baseline.py`, smoke test semantic search & exact lookup chính xác, xuất file `data/results/agent_demo_answers.json`.
 - [x] **CP3 (01:35 - 02:00):** Verify baseline count 48/48 & sinh `docs/dashboard.html` thật với 100% Hit Rate & Token F1.
 - [x] **CP4 (02:00 - 02:15):** Nghỉ 15 phút, cập nhật nhật ký kỹ thuật R4 & chuẩn bị tập câu hỏi test cho CP5.
-- [ ] **CP5 (02:15 - 03:15):** Build `papers-corrupted` collection, đo tác động suy giảm chất lượng retrieval.
-- [ ] **CP6 (03:15 - 04:00):** Build `papers-repaired`, hoàn thiện Dashboard Tier 1 & Compare CLI Tier 2, dẫn buổi Live Demo.
+- [x] **CP5 (02:15 - 03:15):** Build `papers-corrupted` collection thành công (49 docs), xác minh `papers-baseline` nguyên vẹn.
+- [x] **CP6 (03:15 - 04:00):** Build `papers-repaired` collection thành công (48 docs), hoàn thiện Dashboard Tier 1 & Compare CLI Tier 2 cho Live Demo.
