@@ -177,8 +177,9 @@ hoặc chấp nhận bảng quality không có cột baseline và trỏ sang `ph
   R5 chỉ đọc df nên rủi ro thấp, nhưng nếu CP5 metrics không đổi thì kiểm điều này **trước tiên**.
 - **Bẫy JSON.** `write_json` dùng `json.dumps`; `numpy.int64` / `numpy.bool_` không serialize được.
   Mọi kết quả pandas phải ép `int()` / `float()` / `bool()`.
-- **`max_results = 24`** (mặc định trong `config.py`) → nếu Crossref trả ít record,
-  `row_count_min >= 10` có thể fail ngay ở baseline. Theo dõi khi R2 fetch xong.
+- ~~**`max_results = 24`**~~ → R1 đã nâng lên **48** ở `config.py`, và `run_context.json`
+  đã được ghi. Rủi ro `row_count_min >= 10` fail ở baseline giảm đáng kể, nhưng vẫn
+  theo dõi khi R2 fetch dataset đầy đủ.
 - **Chuỗi phụ thuộc R2 → R3 → R5.** Đối sách: test `quality.py` bằng DataFrame giả,
   không chờ dữ liệu thật.
 
@@ -305,13 +306,91 @@ Kiểm tra mạnh nhất là **contract test cho Bẫy 6**: với mỗi câu h�
 `data/eval/smoke_test_set.json` rồi xóa. Nếu ghi đè, `phase1.py` sẽ load test set giả
 khi `REFRESH_TEST_SET` tắt và chạy câu hỏi giả trên dữ liệu thật.
 
-### 2.5. Việc còn lại
+---
 
-- [ ] CP3 — `generate_phase1_report` + `summarize_judge_reliability` + `summarize_by_question_type`
+## CP3 · 01:35–02:00 — `generate_phase1_report`
+
+### 3.1. Đã hoàn thành
+
+`generate_phase1_report` trong `src/observability/reporting.py`, cùng 4 helper mà pipeline
+cần gọi. Report gồm 6 mục: nguồn/run context · evaluation metrics · độ tin cậy judge ·
+metric theo loại câu hỏi · ví dụ hit/miss · data quality · freshness · Ragas · giới hạn kết luận.
+
+### 3.2. Một dòng duy nhất R1 phải thêm
+
+`bundle.summary` chỉ có 5 khóa và **không** chứa `judge_fallback_rate`, phân tích theo
+`question_type`, hay ví dụ hit/miss — tất cả nằm trong `bundle.answers` mà hàm report
+không nhận. Thay vì đổi chữ ký hàm (contract đóng băng), R5 cung cấp `enrich_metrics`:
+
+```python
+from observability.reporting import enrich_metrics
+
+metrics = enrich_metrics(bundle.summary, bundle.answers)
+generate_phase1_report(settings.paths.baseline_report, source_summary, metrics, quality, freshness)
+```
+
+Áp dụng cho cả 3 trạng thái trong `phase1.py` và `corruption_flow.py`. Ghi `metrics` đã
+enrich xuống đĩa luôn thì file `*_metrics.json` cũng mang theo độ tin cậy của judge.
+
+Nếu R1 quên gọi, report **vẫn sinh ra bình thường** nhưng ghi rõ ở mục 2.1 và 2.2 là
+*"pipeline chưa gọi `enrich_metrics`"* — không im lặng bỏ qua, cũng không crash.
+
+### 3.3. Bẫy 3 — judge chết âm thầm
+
+`summarize_judge_reliability` đếm sample có `judge.reasoning` bắt đầu bằng
+`"Fallback heuristic judge"` rồi phân loại `judge_mode` thành `llm` / `mixed` / `heuristic`.
+
+Khi `judge_mode == "heuristic"`, report tự chèn cảnh báo:
+
+> ⚠️ Toàn bộ sample rơi về heuristic judge. `judge_accuracy` và `mean_judge_score`
+> **không phải LLM-as-a-judge** — chúng chỉ là ngưỡng đặt trên `token_f1`.
+
+Khi `mixed`, cảnh báo rằng hai nhóm không cùng thang đo nên không so sánh trực tiếp
+giữa các trạng thái nếu tỉ lệ fallback khác nhau. Đây là điểm dễ mất điểm nhất ở CP6:
+nếu baseline chạy được LLM judge còn corrupted bị rate limit, phần chênh lệch metric
+có thể đến từ judge chứ không từ corruption.
+
+### 3.4. Sửa một lỗi thiết kế của chính mình
+
+Bản đầu tôi gộp mọi thất bại thành một mục "trường hợp xấu nhất", chọn theo `token_f1`
+thấp nhất **trong nhóm retrieval miss**. Đọc report sinh ra mới thấy nó hiển thị sample
+`token_f1 = 0.90` và gọi đó là xấu nhất, trong khi tồn tại sample `token_f1 = 0.00` bị
+giấu đi — vì sample đó retrieval **đúng**, chỉ nội dung sai.
+
+Đã tách thành hai chế độ hỏng riêng biệt, vì chúng cần hai cách sửa khác nhau:
+
+| Mục trong report | Nghĩa | Sửa ở đâu |
+|---|---|---|
+| Miss loại 1 — retrieval lấy nhầm document | doc kỳ vọng không nằm trong top-k | index hoặc exact-title lookup của `qa.py` |
+| Miss loại 2 — retrieval đúng nhưng trả lời lệch | lấy đúng doc, nội dung vẫn sai | dữ liệu trong metadata hoặc ground truth |
+
+Chi tiết đáng nhớ: retrieval miss trong ví dụ vẫn có `token_f1 = 0.90` vì document lấy
+nhầm có nội dung gần giống. Report ghi thẳng nhận xét này — **không được dùng `token_f1`
+một mình để kết luận về retrieval**. Đúng luận điểm phần 9 của `docs/KNOWLEDGE.md`.
+
+### 3.5. Kết quả smoke test — 50/50 PASS
+
+`answers` được dựng đúng schema `evaluate_pipeline` sinh ra (`metrics.py:117-131`),
+với câu trả lời tính bằng `_extract_answer` thật và `token_f1` tính bằng `_token_f1` thật,
+nên mọi con số trong report là số thật.
+
+| Nhóm | Kiểm tra |
+|---|---|
+| Helper | `judge_mode` đúng · `by_question_type` phủ hết loại · examples tách đúng 3 trường hợp · `answer_miss` đúng là sample F1 thấp nhất trong nhóm hit |
+| Cấu trúc | đủ 10 heading |
+| **Số khớp artifact** | `retrieval_hit_rate` · `mean_token_f1` · `judge_accuracy` · `row_count` · `latest_published` · `samples` đều xuất hiện trong `.md` đúng như trong dict nguồn |
+| Judge heuristic | `judge_mode = heuristic` → report chứa cảnh báo "không phải LLM-as-a-judge" |
+| Không có retrieval miss | report ghi rõ "không có sample nào" thay vì bỏ trống mục |
+| Mọi sample hoàn hảo | chỉ còn `best_hit`, không bịa ra miss |
+| R1 quên `enrich_metrics` | report vẫn sinh, ghi rõ thiếu |
+| Dict rỗng | không crash |
+
+### 3.6. Việc còn lại
+
 - [ ] CP5 — chạy quality/freshness trên corrupted, nối corruption log với signal
-- [ ] CP6 — `generate_corruption_report`
-- [ ] Chờ R2 hoàn thiện `fetch_source_records` + `load_raw_records` để có dataset đầy đủ
+- [ ] CP6 — `generate_corruption_report` (helper `enrich_metrics` và `METRIC_KEYS` dùng lại được)
+- [ ] Đọc 1 hit + 1 miss **trên dữ liệu thật** khi R1 chạy được `phase1.py`
 
-**Blocker cần R1 xử lý:** `phase1.py` và `corruption_flow.py` vẫn còn `NotImplementedError`.
-Không chạy được end-to-end thì không sinh được `baseline_metrics.json`, và CP3 của R5
-không có input để viết report.
+**Blocker:** `phase1.py` và `corruption_flow.py` vẫn còn `NotImplementedError`. Không chạy
+được end-to-end thì chưa có `baseline_metrics.json` thật để đối chiếu. Toàn bộ phần R5
+đã sẵn sàng nhận input.
