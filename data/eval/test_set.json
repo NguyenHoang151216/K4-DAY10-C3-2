@@ -1,0 +1,128 @@
+[
+  {
+    "id": "summary-01",
+    "question_type": "summary",
+    "question": "Summarize the paper 'Reliable retrieval-augmented feature generation with large language model reasoning'.",
+    "ground_truth": "Abstract Feature generation can significantly enhance learning outcomes, particularly for tasks with limited data.",
+    "ground_truth_doc_ids": [
+      "10.1007/s10115-026-02792-4"
+    ]
+  },
+  {
+    "id": "summary-02",
+    "question_type": "summary",
+    "question": "Summarize the paper 'Hi\u2010 RAG : A Hierarchical Retrieval\u2010Augmented Generation Framework for Scalable and Generalisable Tool Selection in Large Language Model Agents'.",
+    "ground_truth": "ABSTRACT As tool repositories for Large Language Model (LLM) agents grow from dozens to hundreds of endpoints, flat retrieval paradigms that treat the repository as an unstructured list suffer from context overload, cross\u2010domain semantic collision and degraded selection accuracy.",
+    "ground_truth_doc_ids": [
+      "10.1111/exsy.70341"
+    ]
+  },
+  {
+    "id": "summary-03",
+    "question_type": "summary",
+    "question": "Summarize the paper 'A SYSTEMATIC REVIEW OF OPTIMIZED RETRIEVAL-AUGMENTED GENERATION FRAMEWORKS FOR REDUCING HALLUCINATIONS IN LARGE LANGUAGE MODELS'.",
+    "ground_truth": "Large Language Models (LLMs) have proven to be making great progress on natural language processing, but they tend to produce hallucinated or even inaccurate information.",
+    "ground_truth_doc_ids": [
+      "10.36713/epra26155"
+    ]
+  },
+  {
+    "id": "summary-04",
+    "question_type": "summary",
+    "question": "Summarize the paper 'Clinical Large Language Models with Multi-Stage Instruction Tuning and Advanced Retrieval-Augmented Generation'.",
+    "ground_truth": "The demand for efficient and accurate Clinical Decision Support Systems (CDSS) is growing rapidly, driven by the escalating volume of medical data.",
+    "ground_truth_doc_ids": [
+      "10.20944/preprints202602.0996.v1"
+    ]
+  },
+  {
+    "id": "summary-05",
+    "question_type": "summary",
+    "question": "Summarize the paper 'Retrieval-Augmented Generation (RAG), Generative AI, and Agentic AI Governance: An Integrated Enterprise Governance Prioritization Architecture'.",
+    "ground_truth": "Abstract Enterprise adoption of artificial intelligence (AI) systems, including Generative AI (GenAI), Retrieval-Augmented Generation (RAG), and agentic AI, is advancing faster than many organizations can adapt their governance, audit, cybersecurity, and executive oversight practices.",
+    "ground_truth_doc_ids": [
+      "10.21203/rs.3.rs-10012178/v1"
+    ]
+  },
+  {
+    "id": "summary-06",
+    "question_type": "summary",
+    "question": "Summarize the paper '0346 Retrieval Augmented Generation Improves Large Language Model Performance in Sleep Medicine'.",
+    "ground_truth": "Abstract Introduction While Large Language Models (LLMs) offer generative capabilities, generic models often lack domain-specific grounding, leading to hallucinations in high-stakes contexts.",
+    "ground_truth_doc_ids": [
+      "10.1093/sleep/zsag091.0346"
+    ]
+  },
+  {
+    "id": "summary-07",
+    "question_type": "summary",
+    "question": "Summarize the paper 'Hallucination in Large Language Models and Retrieval-Augmented Generation: Mechanisms, Mitigation, and Evaluation'.",
+    "ground_truth": "Large language models have demonstrated strong generative capability in question answering, dialogue, and other knowledge-intensive tasks.",
+    "ground_truth_doc_ids": [
+      "10.54254/2753-8818/2026.dl34055"
+    ]
+  },
+  {
+    "id": "summary-08",
+    "question_type": "summary",
+    "question": "Summarize the paper 'Hybrid Graph Neural Network and Large Language Model Framework for Robust Knowledge Graph Question Answering via Retrieval-Augmented Generation'.",
+    "ground_truth": "Knowledge graphs (KGs) hold facts about the world as connected triples, and they have become a backbone for any system that needs to reason over linked information.",
+    "ground_truth_doc_ids": [
+      "10.22214/ijraset.2026.82233"
+    ]
+  },
+  {
+    "id": "authors-01",
+    "question_type": "authors",
+    "question": "Who authored 'Reliable retrieval-augmented feature generation with large language model reasoning'?",
+    "ground_truth": "Jinghan Zhang, Xinhao Zhang, Fengran Mo, Dakshak Keerthi Chandra, Yu-Zhong Chen, Fei Xie, Kunpeng Liu",
+    "ground_truth_doc_ids": [
+      "10.1007/s10115-026-02792-4"
+    ]
+  },
+  {
+    "id": "authors-02",
+    "question_type": "authors",
+    "question": "Who authored 'Hi\u2010 RAG : A Hierarchical Retrieval\u2010Augmented Generation Framework for Scalable and Generalisable Tool Selection in Large Language Model Agents'?",
+    "ground_truth": "Wei Tian, Yuhao Zhou",
+    "ground_truth_doc_ids": [
+      "10.1111/exsy.70341"
+    ]
+  },
+  {
+    "id": "authors-03",
+    "question_type": "authors",
+    "question": "Who authored 'A SYSTEMATIC REVIEW OF OPTIMIZED RETRIEVAL-AUGMENTED GENERATION FRAMEWORKS FOR REDUCING HALLUCINATIONS IN LARGE LANGUAGE MODELS'?",
+    "ground_truth": "Jaipal Kumar, Dr. Shashank Swami",
+    "ground_truth_doc_ids": [
+      "10.36713/epra26155"
+    ]
+  },
+  {
+    "id": "date-01",
+    "question_type": "date",
+    "question": "When was 'Clinical Large Language Models with Multi-Stage Instruction Tuning and Advanced Retrieval-Augmented Generation' published?",
+    "ground_truth": "2026-02-12",
+    "ground_truth_doc_ids": [
+      "10.20944/preprints202602.0996.v1"
+    ]
+  },
+  {
+    "id": "date-02",
+    "question_type": "date",
+    "question": "When was 'Retrieval-Augmented Generation (RAG), Generative AI, and Agentic AI Governance: An Integrated Enterprise Governance Prioritization Architecture' published?",
+    "ground_truth": "2026-06-15",
+    "ground_truth_doc_ids": [
+      "10.21203/rs.3.rs-10012178/v1"
+    ]
+  },
+  {
+    "id": "date-03",
+    "question_type": "date",
+    "question": "When was '0346 Retrieval Augmented Generation Improves Large Language Model Performance in Sleep Medicine' published?",
+    "ground_truth": "2026-05-08",
+    "ground_truth_doc_ids": [
+      "10.1093/sleep/zsag091.0346"
+    ]
+  }
+]

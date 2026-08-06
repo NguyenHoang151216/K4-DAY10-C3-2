@@ -1,0 +1,5 @@
+{
+  "status": "skipped",
+  "question": "Summarize the paper 'Reliable retrieval-augmented feature generation with large language model reasoning'.",
+  "reason": "Agent unavailable: RuntimeError"
+}
