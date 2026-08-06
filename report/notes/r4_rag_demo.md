@@ -28,7 +28,7 @@
 ## 📅 Nhật ký Checkpoint
 - [x] **CP0 (00:00 - 00:30):** Khởi tạo nhánh, nghiên cứu contract `src/retrieval/`, phác thảo khung `src/presentation/dashboard.py` và chuẩn bị tệp nhật ký R4.
 - [x] **CP1 (00:30 - 01:05):** Đã khởi tạo script `script/inspect_clean_data.py` để tự động kiểm tra 16 cột contract & 5 mẫu `text_for_embedding`. Đã hoàn thiện layout HTML Dashboard trong `src/presentation/dashboard.py` và sinh thử file `docs/dashboard.html`.
-- [ ] **CP2 (01:05 - 01:35):** Build `papers-baseline` Chroma index, smoke test retrieval, xuất `agent_demo_answers.json`.
+- [x] **CP2 (01:05 - 01:35):** Build `papers-baseline` Chroma index thành công qua `script/run_cp2_baseline.py`, smoke test semantic search & exact lookup chính xác, xuất file `data/results/agent_demo_answers.json`.
 - [ ] **CP3 (01:35 - 02:00):** Verify baseline count & sinh `docs/dashboard.html` thử nghiệm.
 - [ ] **CP4 (02:00 - 02:15):** Nghỉ 15 phút, cập nhật note.
 - [ ] **CP5 (02:15 - 03:15):** Build `papers-corrupted` collection, đo tác động suy giảm chất lượng retrieval.
