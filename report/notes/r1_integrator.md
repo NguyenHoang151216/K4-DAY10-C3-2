@@ -15,3 +15,13 @@
 - Không refresh Crossref source hoặc test set giữa ba trạng thái.
 - Không ghi đè collection `papers-baseline` khi build corrupted/repaired.
 - Mọi số liệu trong report phải đọc từ JSON artifact, không chép số thủ công.
+
+## CP5 — Corruption có kiểm soát
+
+- `run_corruption_flow.py` hoàn tất đủ `8/8`; guard xác nhận baseline artifact tồn tại và không tự chạy Phase 1 ngầm.
+- Corruption deterministic với `seed=42`: 48 baseline row → 49 corrupted row, đủ 6 operator và 7 row được xác minh thực sự đổi nội dung.
+- Collection được tách đúng: `papers-baseline=48`, `papers-corrupted=49`; hash baseline artifact và baseline collection count không đổi sau flow.
+- Quality hard failures: `paper_id_unique`, `summary_all_usable`; freshness chuyển từ pass sang fail.
+- Metrics giảm so với baseline: retrieval hit `1.0000 → 0.8571`, token F1 `1.0000 → 0.7174`, judge accuracy `1.0000 → 0.7143`, mean judge score `5.0000 → 3.8571`.
+- `corruption_impact.json` ghi detection rate `0.8333`; `inject_noise` là operator không bị structural quality/freshness bắt, chỉ biểu hiện qua metric RAG.
+- Judge vẫn ở chế độ heuristic với `judge_fallback_rate=1.0`; không diễn giải judge metrics như LLM-as-a-judge.
