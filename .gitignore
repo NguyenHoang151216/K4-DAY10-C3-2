@@ -6,4 +6,6 @@ src/*.egg-info/
 lab/
 **/__pycache__/
 .vscode/
-.github/
+data/chroma/
+.pytest_cache/
+data/chroma/

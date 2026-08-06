@@ -174,6 +174,14 @@ def main() -> None:
         settings.paths.baseline_metrics,
         settings.paths.baseline_answers,
     )
+    # R5 derives judge reliability and per-question-type evidence from the
+    # answer rows. Persist the enriched payload so the JSON and Markdown report
+    # tell the same story, especially when every LLM judge call falls back to
+    # the local heuristic.
+    from observability.reporting import enrich_metrics
+
+    baseline_metrics = enrich_metrics(evaluation.summary, evaluation.answers)
+    write_json(settings.paths.baseline_metrics, baseline_metrics)
 
     _log_step(11, "Run agent smoke test")
     _run_agent_smoke_test(settings, index, test_set)
@@ -193,7 +201,7 @@ def main() -> None:
             "source_refreshed": source_refreshed,
             "run_date": run_date.isoformat(),
         },
-        evaluation.summary,
+        baseline_metrics,
         quality,
         freshness,
     )
