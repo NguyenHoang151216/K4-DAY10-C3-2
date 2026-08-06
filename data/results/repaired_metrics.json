@@ -1,0 +1,54 @@
+{
+  "samples": 14,
+  "retrieval_hit_rate": 1.0,
+  "mean_token_f1": 1.0,
+  "judge_accuracy": 1.0,
+  "mean_judge_score": 5,
+  "ragas": {
+    "skipped": "Set RUN_RAGAS=1 to enable the slower Ragas pass."
+  },
+  "judge_fallback_count": 14,
+  "judge_fallback_rate": 1.0,
+  "judge_mode": "heuristic",
+  "by_question_type": {
+    "authors": {
+      "samples": 3,
+      "retrieval_hit_rate": 1.0,
+      "mean_token_f1": 1.0,
+      "judge_accuracy": 1.0
+    },
+    "date": {
+      "samples": 3,
+      "retrieval_hit_rate": 1.0,
+      "mean_token_f1": 1.0,
+      "judge_accuracy": 1.0
+    },
+    "summary": {
+      "samples": 8,
+      "retrieval_hit_rate": 1.0,
+      "mean_token_f1": 1.0,
+      "judge_accuracy": 1.0
+    }
+  },
+  "examples": {
+    "best_hit": {
+      "id": "summary-01",
+      "question_type": "summary",
+      "question": "Summarize the paper 'Reliable retrieval-augmented feature generation with large language model reasoning'.",
+      "ground_truth": "Abstract Feature generation can significantly enhance learning outcomes, particularly for tasks with limited data.",
+      "answer": "Abstract Feature generation can significantly enhance learning outcomes, particularly for tasks with limited data.",
+      "ground_truth_doc_ids": [
+        "10.1007/s10115-026-02792-4"
+      ],
+      "retrieved_doc_ids": [
+        "10.1007/s10115-026-02792-4",
+        "10.63503/j.ijaimd.2026.233",
+        "10.55041/isjem07213",
+        "10.36713/epra26155"
+      ],
+      "retrieval_hit": true,
+      "token_f1": 1.0,
+      "judge_score": 5
+    }
+  }
+}

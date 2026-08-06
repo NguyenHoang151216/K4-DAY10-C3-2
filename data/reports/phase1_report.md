@@ -1,6 +1,6 @@
 # Phase 1 Report — Baseline
 
-Sinh lúc: `2026-08-06T10:15:32.189474+00:00`
+Sinh lúc: `2026-08-06T13:15:57.871288+00:00`
 
 Mọi số liệu trong báo cáo này được đọc trực tiếp từ artifact JSON do pipeline ghi ra.
 
@@ -14,7 +14,7 @@ Mọi số liệu trong báo cáo này được đọc trực tiếp từ artifa
 | Query | agentic retrieval augmented generation large language model |
 | Filter | from-pub-date:2026-02-07,has-abstract:true |
 | max_results | 48 |
-| run_date | 2026-08-06T10:15:02.626675+00:00 |
+| run_date | 2026-08-06T13:15:35.322351+00:00 |
 | Đã fetch lại nguồn | ❌ không |
 | Raw records vào | 48 |
 | Clean rows ra | 48 |
@@ -74,7 +74,7 @@ Mọi số liệu trong báo cáo này được đọc trực tiếp từ artifa
 | Số row | 48 |
 | Kết luận | ✅ PASS |
 | Hard check fail | – |
-| Warning | categories_present_ratio |
+| Warning | categories_present_ratio, no_future_published |
 
 | Check | Mức | Kết quả | Quan sát | Kỳ vọng |
 |---|---|---|---|---|
@@ -84,12 +84,13 @@ Mọi số liệu trong báo cáo này được đọc trực tiếp từ artifa
 | `paper_id_unique` | hard | ✅ | 0 | 0 duplicate paper_id |
 | `title_not_empty` | hard | ✅ | 0 | 0 empty title |
 | `text_for_embedding_not_empty` | hard | ✅ | 0 | 0 empty text_for_embedding |
-| `summary_usable_ratio` | hard | ✅ | 1.0000 | >= 0.9 |
+| `summary_all_usable` | hard | ✅ | 0 | 0 row |
 | `title_min_length` | warn | ✅ | 0 | 0 title shorter than 15 chars |
 | `authors_present_ratio` | warn | ✅ | 1.0000 | >= 0.9 |
 | `categories_present_ratio` | warn | ❌ | 0.0000 | >= 0.8 |
 | `published_iso_format` | warn | ✅ | 0 | 0 value outside YYYY-MM-DD |
-| `freshness_stale_ratio` | warn | ✅ | 0.0000 | <= 0.2 |
+| `no_future_published` | warn | ❌ | 1 | 0 row |
+| `freshness_no_stale_rows` | warn | ✅ | 0 | 0 row |
 
 ## 4. Freshness
 

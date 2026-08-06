@@ -622,6 +622,310 @@ def generate_phase1_report(
     print(f"[report] phase1 -> {report_path}")
 
 
+# --------------------------------------------------------------------------- so sanh 3 trang thai
+
+_COMPARED_METRICS = (
+    ("retrieval_hit_rate", "`retrieval_hit_rate`"),
+    ("mean_token_f1", "`mean_token_f1`"),
+    ("judge_accuracy", "`judge_accuracy`"),
+    ("mean_judge_score", "`mean_judge_score`"),
+)
+
+
+def _delta(new: Any, old: Any) -> str:
+    """Chenh lech co dau. Thieu mot dau thi tra 'n/a' thay vi coi nhu 0."""
+    if not isinstance(new, (int, float)) or not isinstance(old, (int, float)):
+        return "n/a"
+    if isinstance(new, bool) or isinstance(old, bool):
+        return "n/a"
+    return f"{new - old:+.4f}"
+
+
+def _section_comparison(
+    baseline: dict[str, Any], corrupted: dict[str, Any], repaired: dict[str, Any]
+) -> list[str]:
+    rows = []
+    for key, label in _COMPARED_METRICS:
+        base_value, corr_value, rep_value = baseline.get(key), corrupted.get(key), repaired.get(key)
+        rows.append(
+            [
+                label,
+                _fmt(base_value),
+                _fmt(corr_value),
+                _fmt(rep_value),
+                _delta(corr_value, base_value),
+                _delta(rep_value, base_value),
+                _delta(rep_value, corr_value),
+            ]
+        )
+
+    lines = [
+        "## 1. Bảng so sánh ba trạng thái",
+        "",
+        *_table(
+            [
+                "Metric",
+                "Baseline",
+                "Corrupted",
+                "Repaired",
+                "corruption_delta",
+                "repair_gap",
+                "recovery",
+            ],
+            rows,
+        ),
+        "- `corruption_delta = corrupted − baseline` — corruption làm hỏng bao nhiêu",
+        "- `repair_gap = repaired − baseline` — sau khi sửa **còn lệch baseline** bao nhiêu",
+        "- `recovery = repaired − corrupted` — bước repair kéo lại được bao nhiêu",
+        "",
+    ]
+
+    samples = {
+        "baseline": baseline.get("samples"),
+        "corrupted": corrupted.get("samples"),
+        "repaired": repaired.get("samples"),
+    }
+    distinct = {value for value in samples.values() if value is not None}
+    if len(distinct) > 1:
+        lines += [
+            f"> ⚠️ **Số sample không khớp nhau giữa ba trạng thái** ({_fmt(samples)}). "
+            "Phép so sánh chỉ có nghĩa khi cả ba dùng đúng cùng một test set — "
+            "kiểm tra lại xem test set có bị sinh lại từ dữ liệu corrupted không.",
+            "",
+        ]
+    else:
+        lines += [
+            f"Cả ba trạng thái được đo trên **{_fmt(samples['baseline'])} sample giống hệt nhau**.",
+            "",
+        ]
+    return lines
+
+
+def _section_judge_caveat(
+    baseline: dict[str, Any], corrupted: dict[str, Any], repaired: dict[str, Any]
+) -> list[str]:
+    """Canh bao judge phai duoc ke thua sang bao cao so sanh.
+
+    Neu chi phase1_report ghi ro judge la heuristic con bao cao nay im lang, nguoi doc
+    se mac dinh `judge_accuracy` trong bang tren la LLM-as-a-judge.
+    """
+    rows = []
+    for label, metrics in (
+        ("baseline", baseline),
+        ("corrupted", corrupted),
+        ("repaired", repaired),
+    ):
+        rows.append(
+            [
+                label,
+                _fmt(metrics.get("judge_mode")),
+                _fmt(metrics.get("judge_fallback_count")),
+                _fmt(metrics.get("judge_fallback_rate")),
+            ]
+        )
+
+    lines = [
+        "## 2. Độ tin cậy của judge",
+        "",
+        *_table(["Trạng thái", "judge_mode", "Số sample fallback", "Tỉ lệ fallback"], rows),
+    ]
+
+    modes = {
+        str(metrics.get("judge_mode"))
+        for metrics in (baseline, corrupted, repaired)
+        if metrics.get("judge_mode")
+    }
+    if modes and modes <= {"heuristic"}:
+        lines += [
+            "> ⚠️ **Toàn bộ sample ở cả ba trạng thái đều rơi về heuristic judge.** "
+            "`judge_accuracy` và `mean_judge_score` trong bảng mục 1 **không phải "
+            "LLM-as-a-judge** — chúng là ngưỡng đặt trên `token_f1`, nên không mang "
+            "thêm thông tin độc lập so với `mean_token_f1`. Đọc kết luận dựa vào "
+            "`retrieval_hit_rate` và `mean_token_f1`.",
+            "",
+        ]
+    elif "mixed" in modes:
+        lines += [
+            "> ⚠️ Judge chạy **không đồng nhất** giữa các trạng thái (có trạng thái rơi về "
+            "heuristic, có trạng thái không). So sánh `judge_accuracy` giữa chúng là so "
+            "hai thước đo khác nhau — không dùng cột đó để kết luận.",
+            "",
+        ]
+    return lines
+
+
+def _section_type_comparison(
+    baseline: dict[str, Any], corrupted: dict[str, Any], repaired: dict[str, Any]
+) -> list[str]:
+    """Tach theo question_type vi cac operator tac dong khong deu.
+
+    Blank summary ha token_f1 cua cau `summary` nhung khong dung den cau `date`.
+    Nhin metric tong the se lam mo dieu do.
+    """
+    base_by_type = baseline.get("by_question_type", {}) or {}
+    corr_by_type = corrupted.get("by_question_type", {}) or {}
+    rep_by_type = repaired.get("by_question_type", {}) or {}
+    all_types = sorted(set(base_by_type) | set(corr_by_type) | set(rep_by_type))
+
+    rows = []
+    for question_type in all_types:
+        base = base_by_type.get(question_type, {})
+        corr = corr_by_type.get(question_type, {})
+        rep = rep_by_type.get(question_type, {})
+        for metric in ("retrieval_hit_rate", "mean_token_f1"):
+            rows.append(
+                [
+                    f"`{question_type}`",
+                    f"`{metric}`",
+                    _fmt(base.get("samples")),
+                    _fmt(base.get(metric)),
+                    _fmt(corr.get(metric)),
+                    _fmt(rep.get(metric)),
+                    _delta(corr.get(metric), base.get(metric)),
+                ]
+            )
+
+    return [
+        "## 3. Phân tích theo `question_type`",
+        "",
+        *_table(
+            [
+                "question_type",
+                "Metric",
+                "n",
+                "Baseline",
+                "Corrupted",
+                "Repaired",
+                "corruption_delta",
+            ],
+            rows,
+        ),
+        "Loại câu hỏi nào tụt mạnh nhất cho biết corruption chạm vào **trường dữ liệu nào**: "
+        "`summary` tụt → blank/noise trên abstract; `date` tụt → stale date; "
+        "`retrieval_hit_rate` tụt ở mọi loại → drop document hoặc truncate title phá exact lookup.",
+        "",
+    ]
+
+
+def _section_quality_comparison(
+    corrupted_quality: dict[str, Any], repaired_quality: dict[str, Any]
+) -> list[str]:
+    corrupted_checks = _check_status(corrupted_quality)
+    repaired_checks = _check_status(repaired_quality)
+    all_names = sorted(set(corrupted_checks) | set(repaired_checks))
+
+    rows = [
+        [f"`{name}`", _fmt(corrupted_checks.get(name)), _fmt(repaired_checks.get(name))]
+        for name in all_names
+    ]
+    still_failing = sorted(name for name, passed in repaired_checks.items() if not passed)
+
+    lines = [
+        "## 4. Data quality: corrupted vs repaired",
+        "",
+        *_table(["Check", "Corrupted", "Repaired"], rows),
+    ]
+    if still_failing:
+        lines += [
+            f"> Sau repair vẫn còn fail: {_fmt(still_failing)}. "
+            "Cần đối chiếu với kết quả baseline: check nào **fail y hệt ở baseline** là "
+            "giới hạn của nguồn dữ liệu, **không phải** hệ quả của corruption và cũng "
+            "không phải repair làm chưa tới.",
+            "",
+        ]
+    else:
+        lines += ["Repaired pass toàn bộ data quality check.", ""]
+    return lines
+
+
+def _section_freshness_comparison(
+    corrupted_freshness: dict[str, Any], repaired_freshness: dict[str, Any]
+) -> list[str]:
+    rows = [
+        [f"`{key}`", _fmt(corrupted_freshness.get(key)), _fmt(repaired_freshness.get(key))]
+        for key in _FRESHNESS_WATCHED
+        if key in corrupted_freshness or key in repaired_freshness
+    ]
+    return [
+        "## 5. Freshness: corrupted vs repaired",
+        "",
+        *_table(["Tín hiệu", "Corrupted", "Repaired"], rows),
+    ]
+
+
+def _section_verdict(
+    baseline: dict[str, Any],
+    corrupted: dict[str, Any],
+    repaired: dict[str, Any],
+    repaired_quality: dict[str, Any],
+) -> list[str]:
+    """Ket luan phai noi ro phan CHUA phuc hoi, khong chi khoe phan da phuc hoi."""
+    lines = ["## 6. Kết luận", ""]
+
+    dropped = [
+        label
+        for key, label in _COMPARED_METRICS
+        if isinstance(corrupted.get(key), (int, float))
+        and isinstance(baseline.get(key), (int, float))
+        and corrupted[key] < baseline[key]
+    ]
+    lines += [
+        f"**Corruption → agent metric.** Metric giảm so với baseline: "
+        f"{_fmt(dropped) if dropped else '*(không metric nào giảm)*'}.",
+        "",
+    ]
+    if not dropped:
+        lines += [
+            "> ⚠️ Không metric nào giảm. Kiểm tra theo thứ tự: dữ liệu có thực sự đổi không "
+            "(pandas Copy-on-Write) · document bị corrupt có nằm trong test set không · "
+            "`text_for_embedding` đã rebuild chưa · có đang query nhầm collection baseline không.",
+            "",
+        ]
+
+    unrecovered = []
+    for key, label in _COMPARED_METRICS:
+        base_value, rep_value = baseline.get(key), repaired.get(key)
+        if isinstance(base_value, (int, float)) and isinstance(rep_value, (int, float)):
+            if abs(rep_value - base_value) > 1e-9:
+                unrecovered.append(f"{label} (repair_gap {rep_value - base_value:+.4f})")
+
+    if unrecovered:
+        lines += [
+            "**Repair → phục hồi CHƯA hoàn toàn.** Các metric vẫn lệch baseline: "
+            f"{_fmt(unrecovered)}.",
+            "",
+            "Nguyên nhân cần loại trừ: repaired có replay cleaning bằng đúng `run_date` "
+            "trong `run_context.json` không (lệch `run_date` làm `age_days` khác đi), và "
+            "raw snapshot dùng để repair có đúng là snapshot đã dựng baseline không.",
+            "",
+        ]
+    else:
+        lines += [
+            "**Repair → phục hồi hoàn toàn.** Mọi metric so sánh đều trở về đúng giá trị "
+            "baseline (`repair_gap = 0`). Điều này chỉ đạt được khi raw snapshot bất biến "
+            "còn nguyên và cleaning được replay bằng đúng `run_date` của lần chạy baseline.",
+            "",
+        ]
+
+    failed = [name for name, passed in _check_status(repaired_quality).items() if not passed]
+    lines += [
+        f"**Data quality sau repair.** Check còn fail: "
+        f"{_fmt(failed) if failed else '*(không còn check nào fail)*'}.",
+        "",
+        "### Giới hạn của kết luận",
+        "",
+        "- Corruption ở quy mô 1–3 dòng trên tập ~48 dòng thường **không vượt được các "
+        "check dạng tỉ lệ**. Check không fail không có nghĩa dữ liệu còn sạch — nó có "
+        "thể chỉ là ngưỡng quá lỏng so với quy mô lỗi.",
+        "- Noise injection **không có check cấu trúc nào bắt được**: nội dung vẫn đúng kiểu, "
+        "đúng độ dài, đúng schema. Nó chỉ lộ ra qua RAG metric. Đây là lý do quality check "
+        "dạng rule không thay thế được semantic monitoring.",
+        "- `token_f1` mù với paraphrase, và `retrieval_hit_rate` không đo thứ hạng trong top-k.",
+        "",
+    ]
+    return lines
+
+
 def generate_corruption_report(
     report_path,
     baseline_metrics: dict[str, Any],
@@ -632,5 +936,48 @@ def generate_corruption_report(
     corrupted_freshness: dict[str, Any],
     repaired_freshness: dict[str, Any],
 ) -> None:
-    """TODO(student): viet markdown report so sanh baseline/corrupted/repaired."""
-    raise NotImplementedError("Student task: implement corruption comparison report.")
+    """Viet markdown report so sanh baseline / corrupted / repaired.
+
+    Ba dai luong duoc tach rieng vi chung tra loi ba cau hoi khac nhau:
+
+    - `corruption_delta = corrupted - baseline`  : corruption lam hong bao nhieu
+    - `repair_gap      = repaired  - baseline`   : sau khi sua con lech baseline bao nhieu
+    - `recovery        = repaired  - corrupted`  : buoc repair keo lai duoc bao nhieu
+
+    `recovery` lon KHONG dong nghia voi repair thanh cong: neu `repair_gap` van khac 0
+    thi van con phan chua phuc hoi. Bao cao phai noi ro dieu do thay vi chi khoe
+    `recovery`.
+
+    Moi so deu doc tu dict truyen vao, khong tinh lai va khong hard-code, de `.md`
+    luon khop `.json` tren dia.
+    """
+    baseline_metrics = baseline_metrics or {}
+    corrupted_metrics = corrupted_metrics or {}
+    repaired_metrics = repaired_metrics or {}
+    corrupted_quality = corrupted_quality or {}
+    repaired_quality = repaired_quality or {}
+    corrupted_freshness = corrupted_freshness or {}
+    repaired_freshness = repaired_freshness or {}
+
+    lines: list[str] = [
+        "# Corruption Report — Baseline vs Corrupted vs Repaired",
+        "",
+        f"Sinh lúc: `{now_utc().isoformat()}`",
+        "",
+        "Ba trạng thái được đánh giá trên **cùng một test set**, cùng embedding model, "
+        "cùng `top_k` và cùng judge. Chỉ trạng thái dataset thay đổi — đây là điều kiện "
+        "để phép so sánh có nghĩa.",
+        "",
+        "---",
+        "",
+    ]
+
+    lines += _section_comparison(baseline_metrics, corrupted_metrics, repaired_metrics)
+    lines += _section_judge_caveat(baseline_metrics, corrupted_metrics, repaired_metrics)
+    lines += _section_type_comparison(baseline_metrics, corrupted_metrics, repaired_metrics)
+    lines += _section_quality_comparison(corrupted_quality, repaired_quality)
+    lines += _section_freshness_comparison(corrupted_freshness, repaired_freshness)
+    lines += _section_verdict(baseline_metrics, corrupted_metrics, repaired_metrics, repaired_quality)
+
+    write_text(Path(report_path), "\n".join(lines).rstrip() + "\n")
+    print(f"[report] corruption comparison -> {report_path}")

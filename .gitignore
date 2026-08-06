@@ -6,6 +6,7 @@ src/*.egg-info/
 lab/
 **/__pycache__/
 .vscode/
+# Chroma la sqlite binary + file .bin, rebuild duoc tu embedding manifest.
+# Commit vao git thi conflict khong giai noi va lam phinh repo.
 data/chroma/
 .pytest_cache/
-data/chroma/

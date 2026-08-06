@@ -5,7 +5,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from core.config import Settings, load_settings
-from core.utils import read_json, write_csv, write_json
+from core.utils import normalize_manifest_persist_path, read_json, write_csv, write_json
 
 if TYPE_CHECKING:
     from retrieval.index import LocalEmbeddingIndex
@@ -160,6 +160,9 @@ def main() -> None:
         settings,
         settings.paths.embeddings_json,
     )
+    # index.py ghi persist_path tuyet doi; manifest duoc commit nen phai neo
+    # ve duong dan tuong doi de tai lap duoc tren may khac.
+    normalize_manifest_persist_path(settings.paths.embeddings_json, settings.paths.project_dir)
 
     _log_step(9, "Load or build deterministic evaluation set")
     test_set = _load_or_build_test_set(clean_df, settings)

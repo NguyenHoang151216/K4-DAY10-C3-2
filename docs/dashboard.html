@@ -144,7 +144,7 @@
             <div class="meta">K4 Day 10 Lab — Group 5 | Baseline vs Corrupted vs Repaired State Analysis</div>
         </div>
         <div class="meta" style="text-align: right;">
-            <div>Generated: <strong>2026-08-06 10:36:09 UTC</strong></div>
+            <div>Generated: <strong>2026-08-06 13:16:30 UTC</strong></div>
             <div>Embedding Model: <code>sentence-transformers/all-MiniLM-L6-v2</code></div>
         </div>
     </div>
@@ -161,18 +161,18 @@
         </div>
         <div class="card">
             <div class="card-title">⚠️ Corrupted Hit Rate</div>
-            <div class="metric-big" style="color: #fca5a5;">⏳ Pending CP5</div>
+            <div class="metric-big" style="color: #fca5a5;">85.7%</div>
             <div class="metric-label">Controlled Data Corruption Impact (Will run in CP5)</div>
             <div class="progress-bar-bg">
-                <div class="progress-bar-fill fill-corrupted" style="width: 0%;"></div>
+                <div class="progress-bar-fill fill-corrupted" style="width: 85.71428571428571%;"></div>
             </div>
         </div>
         <div class="card">
             <div class="card-title">✅ Repaired Hit Rate</div>
-            <div class="metric-big" style="color: #6ee7b7;">⏳ Pending CP6</div>
+            <div class="metric-big" style="color: #6ee7b7;">100.0%</div>
             <div class="metric-label">Recovery after Replaying Raw Ingestion Snapshot (Will run in CP6)</div>
             <div class="progress-bar-bg">
-                <div class="progress-bar-fill fill-repaired" style="width: 0%;"></div>
+                <div class="progress-bar-fill fill-repaired" style="width: 100.0%;"></div>
             </div>
         </div>
     </div>
@@ -202,19 +202,19 @@
                 </tr>
                 <tr>
                     <td><span class="badge badge-corrupted">CORRUPTED</span></td>
-                    <td><strong><span class="neutral" style="font-size: 13px; font-weight: normal;">⏳ Pending (Phase 2)</span></strong></td>
-                    <td><span class="neutral" style="font-size: 13px; font-weight: normal;">⏳ Pending (Phase 2)</span></td>
-                    <td><span class="neutral" style="font-size: 13px; font-weight: normal;">⏳ Pending (Phase 2)</span></td>
-                    <td><span class="neutral" style="font-size: 13px; font-weight: normal;">⏳ Pending (Phase 2)</span></td>
-                    <td><span class="neutral">—</span></td>
+                    <td><strong>85.7%</strong></td>
+                    <td>71.7%</td>
+                    <td>3.86</td>
+                    <td>71.4%</td>
+                    <td><span class="negative">-14.3%</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-repaired">REPAIRED</span></td>
-                    <td><strong><span class="neutral" style="font-size: 13px; font-weight: normal;">⏳ Pending (Phase 2)</span></strong></td>
-                    <td><span class="neutral" style="font-size: 13px; font-weight: normal;">⏳ Pending (Phase 2)</span></td>
-                    <td><span class="neutral" style="font-size: 13px; font-weight: normal;">⏳ Pending (Phase 2)</span></td>
-                    <td><span class="neutral" style="font-size: 13px; font-weight: normal;">⏳ Pending (Phase 2)</span></td>
-                    <td><span class="neutral">—</span></td>
+                    <td><strong>100.0%</strong></td>
+                    <td>100.0%</td>
+                    <td>5.00</td>
+                    <td>100.0%</td>
+                    <td><span class="neutral">0.0%</span></td>
                 </tr>
             </tbody>
         </table>
@@ -286,13 +286,15 @@
         <div class="card">
             <div class="card-title">📂 Generated Artifact Inventory</div>
             <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-muted);">
-                <li>📄 <code>data/clean/papers_clean.csv</code> (24 rows)</li>
-                <li>📄 <code>data/clean/papers_clean_corrupted.csv</code> (CP5)</li>
-                <li>📄 <code>data/clean/papers_clean_repaired.csv</code> (CP6)</li>
-                <li>📊 <code>data/results/baseline_metrics.json</code> (Done)</li>
-                <li>📊 <code>data/results/corrupted_metrics.json</code> (Pending)</li>
-                <li>📊 <code>data/results/repaired_metrics.json</code> (Pending)</li>
-                <li>🛡️ <code>data/reports/phase1_report.md</code> (Done)</li>
+                <li>📄 <code>data/clean/papers_clean.csv</code> (48 rows)</li>
+                <li>📄 <code>data/clean/papers_clean_corrupted.csv</code> (49 rows)</li>
+                <li>📄 <code>data/clean/papers_clean_repaired.csv</code> (48 rows)</li>
+                <li>📊 <code>data/results/baseline_metrics.json</code> (đã sinh)</li>
+                <li>📊 <code>data/results/corrupted_metrics.json</code> (đã sinh)</li>
+                <li>📊 <code>data/results/repaired_metrics.json</code> (đã sinh)</li>
+                <li>🔁 <code>data/results/repair_validation.json</code> (đã sinh)</li>
+                <li>🛡️ <code>data/reports/phase1_report.md</code> (đã sinh)</li>
+                <li>🛡️ <code>data/reports/corruption_report.md</code> (đã sinh)</li>
             </ul>
         </div>
         <div class="card">
