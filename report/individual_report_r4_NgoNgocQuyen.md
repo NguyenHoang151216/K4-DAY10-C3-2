@@ -9,7 +9,7 @@
 | Thông tin | Nội dung |
 | :--- | :--- |
 | **Họ và tên** | Ngô Ngọc Quyền |
-| **MSSV** | R4-Group5-K4 |
+| **MSSV** | 2A202601928 |
 | **Khóa/Lớp** | K4 |
 | **Tên nhóm** | Group 5 |
 | **Vai trò chính** | **Role 4 (R4) — RAG & Demo Owner** |

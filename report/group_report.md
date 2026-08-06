@@ -16,7 +16,7 @@
 | 1 | Phan Đức Anh | 2A202601554 | R1 — Integrator & Release Owner | `src/core/config.py`, `src/pipelines/phase1.py`, `src/pipelines/corruption_flow.py`, `script/`, `data/` |
 | 2 | Nguyễn Chí Hoàng | 2A202601638 | R2 — Ingestion Owner | `src/ingestion/crossref.py`, `docs/KNOWLEDGE.md` |
 | 3 | Phạm Tuấn Anh | 2A202601480 | R3 — Cleaning & Corruption Owner | `src/ingestion/cleaning.py`, `src/ingestion/corruption.py` |
-| 4 | Ngô Ngọc Quyền | *(chờ điền)* | R4 — RAG & Demo Owner | `src/presentation/dashboard.py`, `script/run_dashboard.py`, `script/run_compare_demo.py` |
+| 4 | Ngô Ngọc Quyền | 2A202601928 | R4 — RAG & Demo Owner | `src/presentation/dashboard.py`, `script/run_dashboard.py`, `script/run_compare_demo.py` |
 | 5 | Nguyễn Kỳ Anh | 2A202601558 | R5 — Evaluation & Observability Owner | `src/evaluation/testset.py`, `src/observability/quality.py`, `src/observability/reporting.py` |
 
 Tên và MSSV lấy trực tiếp từ báo cáo cá nhân của từng người trong `report/`, không gán hộ.
@@ -30,9 +30,9 @@ Tên và MSSV lấy trực tiếp từ báo cáo cá nhân của từng người
 | R4 | `report/individual_report_r4_NgoNgocQuyen.md` |
 | R5 | `report/individual_report_r3_NguyenKyAnh.md` |
 
-**Một ô còn trống:** MSSV của R4 trong `individual_report_r4_NgoNgocQuyen.md` đang ghi `R4-Group5-K4` — đó là mã vai trò chứ không phải mã số sinh viên, cần chính chủ sửa lại.
+Đủ tên và MSSV của cả 5 thành viên.
 
-> Ghi chú tên file: báo cáo của R5 (Nguyễn Kỳ Anh) đặt tên `individual_report_r3_NguyenKyAnh.md` theo cách đánh số vai trò của tài liệu BTC, khác với cách đánh số R1–R5 dùng trong repo này. Nội dung bên trong ghi đúng phạm vi Evaluation & Observability. Quy ước `<MSSV>_HoTen.md` trong `report/README.md` §1 nên được áp dụng cho cả 4 file còn lại khi có đủ MSSV.
+> Ghi chú tên file: báo cáo của R5 (Nguyễn Kỳ Anh) đặt tên `individual_report_r3_NguyenKyAnh.md` theo cách đánh số vai trò của tài liệu BTC, khác với cách đánh số R1–R5 dùng trong repo này. Nội dung bên trong ghi đúng phạm vi Evaluation & Observability. Tên file không theo đúng quy ước `<MSSV>_HoTen.md` nhưng mỗi file đều ghi rõ họ tên và MSSV của chủ sở hữu ở mục 1.
 
 ---
 
