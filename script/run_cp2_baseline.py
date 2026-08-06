@@ -3,8 +3,9 @@ Checkpoint 2 Execution Script for Role 4 (R4) - RAG & Demo Owner.
 
 Tasks:
 1. Build Chroma collection 'papers-baseline' from data/clean/papers_clean.csv.
-2. Smoke test semantic search & exact title lookup.
-3. Run RAG Agent demo and export data/results/agent_demo_answers.json.
+2. Ensure relative persist_path in manifest for portability.
+3. Smoke test semantic search & exact title lookup.
+4. Run RAG Agent demo and export data/results/agent_demo_answers.json.
 """
 
 from __future__ import annotations
@@ -28,6 +29,40 @@ from src.retrieval.qa import answer_question
 from src.retrieval.agent import build_agent, run_agent_question
 
 
+def sanitize_manifest_path(manifest_path: Path) -> None:
+    """Ensure manifest persist_path is portable relative path 'data/chroma'."""
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            data["persist_path"] = "data/chroma"
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"[WARN] Failed to sanitize manifest path: {e}")
+
+
+def get_clean_fallback_answer(question: str, settings: Any, index: LocalEmbeddingIndex) -> str:
+    """Get a clean, human-readable answer string without raw exception stacktraces."""
+    try:
+        qa_res = answer_question(question, settings=settings, index=index)
+        ans = qa_res.answer.strip()
+        if ans:
+            return ans
+    except Exception:
+        pass
+
+    results = index.search(question, top_k=1)
+    if results:
+        title = results[0].title
+        summary = results[0].metadata.get("summary", "")
+        if summary:
+            return f"Relevant paper '{title}': {summary[:200]}..."
+        return f"Relevant paper found: {title}"
+
+    return "Information not found in the indexed corpus."
+
+
 def execute_cp2() -> None:
     settings = load_settings()
     paths = settings.paths
@@ -48,6 +83,10 @@ def execute_cp2() -> None:
         settings=settings,
         embeddings_output_path=paths.embeddings_json,
     )
+    
+    # Sanitize manifest path to be relative
+    sanitize_manifest_path(paths.embeddings_json)
+
     print(f"[OK] Chroma index built successfully! Collection doc count: {index.collection.count()}")
 
     # 3. Smoke Test Retrieval & Lookup
@@ -78,19 +117,23 @@ def execute_cp2() -> None:
         print(f"  [WARN] Failed to initialize agent (e.g. LLM API Key required): {e}")
 
     for q in agent_questions:
+        ans = None
         if agent is not None:
             try:
-                ans = run_agent_question(agent, q)
-                answers_list.append({"question": q, "answer": ans, "status": "success"})
-                print(f"  Q: {q}\n  A: {ans[:120]}...\n")
+                raw_ans = run_agent_question(agent, q)
+                # Ensure raw_ans is clean text and not a raw 429 error message string
+                if raw_ans and "RESOURCE_EXHAUSTED" not in str(raw_ans) and "429" not in str(raw_ans):
+                    ans = raw_ans
             except Exception as e:
-                fallback_ans = f"Agent execution fallback: {e}"
-                answers_list.append({"question": q, "answer": fallback_ans, "status": "fallback"})
-                print(f"  Q: {q}\n  A (Fallback): {fallback_ans}\n")
+                print(f"  [WARN] Agent call failed for '{q}': {e}")
+
+        if ans is not None:
+            answers_list.append({"question": q, "answer": ans, "status": "success"})
+            print(f"  Q: {q}\n  A: {str(ans)[:120]}...\n")
         else:
-            fallback_ans = "Agent offline (LLM key not configured)"
-            answers_list.append({"question": q, "answer": fallback_ans, "status": "offline"})
-            print(f"  Q: {q}\n  A (Offline): {fallback_ans}\n")
+            fallback_ans = get_clean_fallback_answer(q, settings=settings, index=index)
+            answers_list.append({"question": q, "answer": fallback_ans, "status": "qa_fallback"})
+            print(f"  Q: {q}\n  A (Fallback): {fallback_ans[:120]}...\n")
 
     # Export agent_demo_answers.json
     paths.demo_answers.parent.mkdir(parents=True, exist_ok=True)

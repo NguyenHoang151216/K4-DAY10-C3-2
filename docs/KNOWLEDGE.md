@@ -137,6 +137,40 @@ Nếu không có raw snapshot, nhóm chỉ còn hai lựa chọn: gọi API lạ
 tập dữ liệu có thể đã thay đổi, hoặc sửa trực tiếp clean data. Cả hai đều không
 chứng minh được repair; chúng tạo một đầu vào mới hoặc che lỗi cũ.
 
+### 6.1. Preflight CP5–CP6 của ingestion owner
+
+R2 khóa bốn artifact trước corruption:
+
+| Artifact | SHA-256 |
+|---|---|
+| Raw response | `3201C23DAD6408B24F6EDFF6BF26D98F93B8BB3528522BD4F78F833F6AFCD3B8` |
+| Raw records | `8407431AE30918943967574339E07BFCDF1EA37782847BE0FD587AE818DD0344` |
+| Run context | `E568510FBA3F2A9A139A08FF2FD03452348A3FE3DE345676091BBF655AEABEEC` |
+| Test set | `5255DAF86B7225FB61F5450D5C5EFC4EC579B6730C6BD963144F3FA9BA850A55` |
+
+Rebuild clean hoàn toàn trong bộ nhớ từ raw snapshot với đúng `run_date` cho:
+
+```text
+baseline_clean_core_hash = 7b3243b2308b272d
+rebuilt_from_raw_core_hash= 7b3243b2308b272d
+core_hash_equal          = true
+paper_id_order_equal     = true
+row_count                = 48
+```
+
+Như vậy dữ liệu expected cho repair đã được xác định trước khi chạy corruption.
+CP5 phải giữ nguyên hai raw hash; CP6 phải cho repaired core hash bằng
+`7b3243b2308b272d`. Candidate lineage ưu tiên lấy từ test set:
+
+```text
+10.1007/s10115-026-02792-4
+10.1111/exsy.70341
+10.36713/epra26155
+```
+
+Candidate cuối cùng chỉ được chốt sau khi có `corruption_log.json`; không giả
+định trước ID nào sẽ bị operator tác động.
+
 ## 7. Controlled experiment
 
 So sánh baseline, corrupted và repaired chỉ có ý nghĩa khi giữ nguyên:
@@ -199,6 +233,9 @@ khi agent giảm chất lượng ngoài các rule đã định nghĩa.
 ## 12. Việc cần bổ sung bằng artifact thật
 
 - [x] R2: thay bảng lineage CP2 bằng ID từ baseline chính thức.
+- [x] R2: khóa raw/run-context/test-set hash và dựng expected repair từ raw.
+- [x] R2: secret scan — `.env` không được track, không thấy key prefix/email.
+- [ ] R2: đối chiếu candidate bị tác động sau khi có corruption/repaired artifact.
 - [ ] R3: điền cleaning stats và corruption IDs/parameters.
 - [ ] R4: điền Chroma count, semantic search và exact lookup evidence.
 - [ ] R5: điền quality/freshness, metric và judge fallback rate.

@@ -1,7 +1,7 @@
 {
-  "report_name": "baseline_quality",
-  "generated_at": "2026-08-06T09:25:16.008175+00:00",
-  "row_count": 48,
+  "report_name": "corrupted_quality",
+  "generated_at": "2026-08-06T09:42:57.674719+00:00",
+  "row_count": 49,
   "thresholds": {
     "min_rows": 10,
     "min_summary_chars": 40,
@@ -11,16 +11,16 @@
     "freshness_threshold_days": 180
   },
   "signals": {
-    "summary_usable_ratio": 1.0,
-    "unusable_summaries": 0,
+    "summary_usable_ratio": 0.9592,
+    "unusable_summaries": 2,
     "authors_present_ratio": 1.0,
     "categories_present_ratio": 0.0,
-    "duplicate_paper_ids": 0,
-    "short_titles": 0,
-    "stale_rows": 0,
-    "stale_ratio": 0.0,
+    "duplicate_paper_ids": 2,
+    "short_titles": 1,
+    "stale_rows": 2,
+    "stale_ratio": 0.0408,
     "invalid_published": 0,
-    "future_published_rows": 1
+    "future_published_rows": 0
   },
   "checks": [
     {
@@ -35,7 +35,7 @@
       "name": "row_count_min",
       "level": "hard",
       "passed": true,
-      "observed": 48,
+      "observed": 49,
       "expected": ">= 10 rows",
       "detail": "too few documents makes retrieval metrics unstable"
     },
@@ -50,8 +50,8 @@
     {
       "name": "paper_id_unique",
       "level": "hard",
-      "passed": true,
-      "observed": 0,
+      "passed": false,
+      "observed": 2,
       "expected": "0 duplicate paper_id",
       "detail": "duplicates bias top-k retrieval towards the repeated document"
     },
@@ -74,16 +74,16 @@
     {
       "name": "summary_all_usable",
       "level": "hard",
-      "passed": true,
-      "observed": 0,
+      "passed": false,
+      "observed": 2,
       "expected": "0 row",
       "detail": "s\u1ed1 row c\u00f3 summary_chars < 40; cleaning.py b\u1ea3o \u0111\u1ea3m b\u1eb1ng 0"
     },
     {
       "name": "title_min_length",
       "level": "warn",
-      "passed": true,
-      "observed": 0,
+      "passed": false,
+      "observed": 1,
       "expected": "0 title shorter than 15 chars",
       "detail": "detects truncated titles, which break entity resolution"
     },
@@ -114,26 +114,30 @@
     {
       "name": "no_future_published",
       "level": "warn",
-      "passed": false,
-      "observed": 1,
+      "passed": true,
+      "observed": 0,
       "expected": "0 row",
       "detail": "s\u1ed1 row c\u00f3 age_days < 0 (published sau run_date)"
     },
     {
       "name": "freshness_no_stale_rows",
       "level": "warn",
-      "passed": true,
-      "observed": 0,
+      "passed": false,
+      "observed": 2,
       "expected": "0 row",
       "detail": "s\u1ed1 row c\u00f3 age_days > 180; source_filter b\u1ea3o \u0111\u1ea3m b\u1eb1ng 0 \u1edf baseline"
     }
   ],
   "hard_checks_total": 7,
   "warning_checks_total": 6,
-  "failed_checks": [],
-  "warning_checks": [
-    "categories_present_ratio",
-    "no_future_published"
+  "failed_checks": [
+    "paper_id_unique",
+    "summary_all_usable"
   ],
-  "passed": true
+  "warning_checks": [
+    "title_min_length",
+    "categories_present_ratio",
+    "freshness_no_stale_rows"
+  ],
+  "passed": false
 }

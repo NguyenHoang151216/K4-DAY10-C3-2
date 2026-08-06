@@ -25,15 +25,37 @@ REQUIRED_COLUMNS = [
 MIN_ROWS = 10
 MIN_SUMMARY_CHARS = 40
 MIN_TITLE_CHARS = 15
-MIN_SUMMARY_USABLE_RATIO = 0.90
 MIN_AUTHORS_PRESENT_RATIO = 0.90
 MIN_CATEGORIES_PRESENT_RATIO = 0.80
-MAX_STALE_RATIO = 0.20
 
 ISO_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}"
 
 HARD = "hard"
 WARN = "warn"
+
+# Ba trang thai duoc danh gia tren cung test set va cung nguong.
+QUALITY_STATES = ("baseline", "corrupted", "repaired")
+
+
+def quality_report_name(state: str) -> str:
+    """Ten report chuan cho `run_data_quality_checks` -> data/quality/<ten>.json."""
+    if state not in QUALITY_STATES:
+        raise ValueError(f"state phai thuoc {QUALITY_STATES}, nhan duoc {state!r}.")
+    return f"{state}_quality"
+
+
+def freshness_report_path(settings: Settings, state: str) -> Path:
+    """Duong dan freshness report cho tung trang thai.
+
+    `config.py` chi dinh nghia MOT `freshness_report`. Hai path con lai duoc derive
+    trong `quality_dir` ngay tai day thay vi de moi noi goi tu dat ten - lech ten
+    mot chu la bang so sanh 3 trang thai o CP6 thieu mat mot cot.
+    """
+    if state not in QUALITY_STATES:
+        raise ValueError(f"state phai thuoc {QUALITY_STATES}, nhan duoc {state!r}.")
+    if state == "baseline":
+        return Path(settings.paths.freshness_report)
+    return Path(settings.paths.quality_dir) / f"freshness_report_{state}.json"
 
 
 def _text_column(df: pd.DataFrame, column: str) -> pd.Series:
@@ -95,11 +117,13 @@ def run_data_quality_checks(df: pd.DataFrame, settings: Settings, report_name: s
     empty_titles = int(title.eq("").sum())
     empty_text_for_embedding = int(text_for_embedding.eq("").sum())
     usable_summaries = int((summary_chars >= MIN_SUMMARY_CHARS).sum())
+    unusable_summaries = total - usable_summaries
     short_titles = int(title.str.len().lt(MIN_TITLE_CHARS).sum())
     with_authors = int(authors_joined.ne("").sum())
     with_categories = int(categories_joined.ne("").sum())
     invalid_published = int((~published.str.match(ISO_DATE_PATTERN, na=False)).sum())
     stale_rows = int((age_days > settings.freshness_threshold_days).sum())
+    future_rows = int((age_days < 0).sum())
 
     summary_usable_ratio = _ratio(usable_summaries, total)
     authors_present_ratio = _ratio(with_authors, total)
@@ -155,13 +179,17 @@ def run_data_quality_checks(df: pd.DataFrame, settings: Settings, report_name: s
             "0 empty text_for_embedding",
             "an empty document still gets embedded and pollutes the collection",
         ),
+        # Nguong tuyet doi, khong phai ti le. cleaning.py da drop moi row co
+        # summary_chars duoi nguong, nen mot dataset da clean PHAI co 0 row nhu vay.
+        # Dung ti le >= 0.90 thi 2 row bi blank tren dataset 40 row cho ra 0.95 va
+        # check im lang - dung luc no can keu nhat.
         _check(
-            "summary_usable_ratio",
+            "summary_all_usable",
             HARD,
-            summary_usable_ratio >= MIN_SUMMARY_USABLE_RATIO,
-            summary_usable_ratio,
-            f">= {MIN_SUMMARY_USABLE_RATIO}",
-            f"share of rows with summary_chars >= {MIN_SUMMARY_CHARS}",
+            unusable_summaries == 0,
+            unusable_summaries,
+            "0 row",
+            f"số row có summary_chars < {MIN_SUMMARY_CHARS}; cleaning.py bảo đảm bằng 0",
         ),
         _check(
             "title_min_length",
@@ -195,13 +223,30 @@ def run_data_quality_checks(df: pd.DataFrame, settings: Settings, report_name: s
             "0 value outside YYYY-MM-DD",
             "published is stored as a string; freshness compares it lexicographically",
         ),
+        # Cung la nguong tuyet doi: `source_filter` dung
+        # `from-pub-date:{today - freshness_threshold_days}`, nen moi paper fetch ve
+        # deu tre hon nguong. Baseline co 0 row stale theo dung cach query duoc dung.
+        # `freshness_no_stale_rows` chi chan dau tren. Crossref tra ve ca ngay
+        # TUONG LAI (issue date cua so bao sap phat hanh) -> age_days am, lam vo
+        # ngu nghia cua "do tuoi" va lam tang "paper moi nhat" cua test set tro
+        # thanh mot paper chua xuat ban. Warn chu khong hard: day la hanh vi hop
+        # le cua nguon, nhung phai nhin thay duoc.
         _check(
-            "freshness_stale_ratio",
+            "no_future_published",
             WARN,
-            stale_ratio <= MAX_STALE_RATIO,
-            stale_ratio,
-            f"<= {MAX_STALE_RATIO}",
-            f"share of rows with age_days > {settings.freshness_threshold_days}",
+            future_rows == 0,
+            future_rows,
+            "0 row",
+            "số row có age_days < 0 (published sau run_date)",
+        ),
+        _check(
+            "freshness_no_stale_rows",
+            WARN,
+            stale_rows == 0,
+            stale_rows,
+            "0 row",
+            f"số row có age_days > {settings.freshness_threshold_days}; "
+            "source_filter bảo đảm bằng 0 ở baseline",
         ),
     ]
 
@@ -216,9 +261,24 @@ def run_data_quality_checks(df: pd.DataFrame, settings: Settings, report_name: s
             "min_rows": MIN_ROWS,
             "min_summary_chars": MIN_SUMMARY_CHARS,
             "min_title_chars": MIN_TITLE_CHARS,
-            "min_summary_usable_ratio": MIN_SUMMARY_USABLE_RATIO,
-            "max_stale_ratio": MAX_STALE_RATIO,
+            "min_authors_present_ratio": MIN_AUTHORS_PRESENT_RATIO,
+            "min_categories_present_ratio": MIN_CATEGORIES_PRESENT_RATIO,
             "freshness_threshold_days": int(settings.freshness_threshold_days),
+        },
+        # Gia tri lien tuc, khong phai pass/fail. Check chi tra loi "co dat hop dong
+        # khong"; signals cho biet "lech bao nhieu" - can cho bang so sanh 3 trang
+        # thai o CP6, vi mot check da fail roi thi fail them nua cung van la fail.
+        "signals": {
+            "summary_usable_ratio": summary_usable_ratio,
+            "unusable_summaries": unusable_summaries,
+            "authors_present_ratio": authors_present_ratio,
+            "categories_present_ratio": categories_present_ratio,
+            "duplicate_paper_ids": duplicate_paper_ids,
+            "short_titles": short_titles,
+            "stale_rows": stale_rows,
+            "stale_ratio": stale_ratio,
+            "invalid_published": invalid_published,
+            "future_published_rows": future_rows,
         },
         "checks": checks,
         "hard_checks_total": sum(1 for check in checks if check["level"] == HARD),
@@ -259,6 +319,9 @@ def build_freshness_report(df: pd.DataFrame, settings: Settings, report_path) ->
         "missing_published_rows": total - len(valid_published),
         "stale_rows": stale_rows,
         "stale_ratio": _ratio(stale_rows, total),
+        # age_days am = published sau run_date. Crossref co ngay xuat ban tuong lai,
+        # nen `min_age_days` co the am va "paper moi nhat" co the chua duoc xuat ban.
+        "future_rows": int((age_days < 0).sum()),
         "min_age_days": float(age_days.min()) if has_age else None,
         "max_age_days": float(age_days.max()) if has_age else None,
         "median_age_days": float(age_days.median()) if has_age else None,

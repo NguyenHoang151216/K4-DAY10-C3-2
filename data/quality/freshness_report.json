@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-06T10:15:04.024310+00:00",
+  "generated_at": "2026-08-06T09:25:16.015888+00:00",
   "threshold_days": 180,
   "total_rows": 48,
   "latest_published": "2026-12-01",
@@ -7,6 +7,7 @@
   "missing_published_rows": 0,
   "stale_rows": 0,
   "stale_ratio": 0.0,
+  "future_rows": 1,
   "min_age_days": -117.0,
   "max_age_days": 175.0,
   "median_age_days": 66.5,
