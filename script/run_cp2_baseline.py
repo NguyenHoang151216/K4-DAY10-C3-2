@@ -3,8 +3,9 @@ Checkpoint 2 Execution Script for Role 4 (R4) - RAG & Demo Owner.
 
 Tasks:
 1. Build Chroma collection 'papers-baseline' from data/clean/papers_clean.csv.
-2. Smoke test semantic search & exact title lookup.
-3. Run RAG Agent demo and export data/results/agent_demo_answers.json.
+2. Ensure relative persist_path in manifest for portability.
+3. Smoke test semantic search & exact title lookup.
+4. Run RAG Agent demo and export data/results/agent_demo_answers.json.
 """
 
 from __future__ import annotations
@@ -28,6 +29,19 @@ from src.retrieval.qa import answer_question
 from src.retrieval.agent import build_agent, run_agent_question
 
 
+def sanitize_manifest_path(manifest_path: Path) -> None:
+    """Ensure manifest persist_path is portable relative path 'data/chroma'."""
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            data["persist_path"] = "data/chroma"
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"[WARN] Failed to sanitize manifest path: {e}")
+
+
 def execute_cp2() -> None:
     settings = load_settings()
     paths = settings.paths
@@ -48,6 +62,10 @@ def execute_cp2() -> None:
         settings=settings,
         embeddings_output_path=paths.embeddings_json,
     )
+    
+    # Sanitize manifest path to be relative
+    sanitize_manifest_path(paths.embeddings_json)
+
     print(f"[OK] Chroma index built successfully! Collection doc count: {index.collection.count()}")
 
     # 3. Smoke Test Retrieval & Lookup
@@ -84,13 +102,26 @@ def execute_cp2() -> None:
                 answers_list.append({"question": q, "answer": ans, "status": "success"})
                 print(f"  Q: {q}\n  A: {ans[:120]}...\n")
             except Exception as e:
-                fallback_ans = f"Agent execution fallback: {e}"
-                answers_list.append({"question": q, "answer": fallback_ans, "status": "fallback"})
-                print(f"  Q: {q}\n  A (Fallback): {fallback_ans}\n")
+                # Fallback to QA answer if LLM API rate limit 429 occurs
+                try:
+                    qa_fallback = answer_question(q, settings=settings, index=index)
+                    ans = qa_fallback.answer
+                    answers_list.append({"question": q, "answer": ans, "status": "qa_fallback"})
+                    print(f"  Q: {q}\n  A (QA Fallback): {ans[:120]}...\n")
+                except Exception:
+                    fallback_ans = f"Agent execution fallback: {e}"
+                    answers_list.append({"question": q, "answer": fallback_ans, "status": "fallback"})
+                    print(f"  Q: {q}\n  A (Fallback): {fallback_ans}\n")
         else:
-            fallback_ans = "Agent offline (LLM key not configured)"
-            answers_list.append({"question": q, "answer": fallback_ans, "status": "offline"})
-            print(f"  Q: {q}\n  A (Offline): {fallback_ans}\n")
+            try:
+                qa_fallback = answer_question(q, settings=settings, index=index)
+                ans = qa_fallback.answer
+                answers_list.append({"question": q, "answer": ans, "status": "qa_fallback"})
+                print(f"  Q: {q}\n  A (QA Fallback): {ans[:120]}...\n")
+            except Exception:
+                fallback_ans = "Agent offline (LLM key not configured)"
+                answers_list.append({"question": q, "answer": fallback_ans, "status": "offline"})
+                print(f"  Q: {q}\n  A (Offline): {fallback_ans}\n")
 
     # Export agent_demo_answers.json
     paths.demo_answers.parent.mkdir(parents=True, exist_ok=True)
