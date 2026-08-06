@@ -32,7 +32,7 @@
 | Báo cáo baseline | `src/observability/reporting.py` → `generate_phase1_report` | source summary, metrics, quality, freshness | `data/reports/phase1_report.md` | Hoàn thành |
 | Đo độ tin cậy metric | `src/observability/reporting.py` → `enrich_metrics`, `summarize_judge_reliability`, `summarize_by_question_type`, `summarize_retrieval_examples` | `bundle.answers` | `judge_fallback_rate`, breakdown theo `question_type`, ví dụ hit/miss | Hoàn thành, **pipeline chưa gọi** |
 | Nối corruption → signal | `src/observability/reporting.py` → `summarize_corruption_impact` | `corruption_log.json` + 2 quality + 2 freshness | `data/quality/corruption_impact.json` | Hoàn thành |
-| Báo cáo so sánh 3 trạng thái | `src/observability/reporting.py` → `generate_corruption_report` | metrics/quality/freshness của 3 trạng thái | `data/reports/corruption_report.md` | **Chưa hoàn thành** |
+| Báo cáo so sánh 3 trạng thái | `src/observability/reporting.py` → `generate_corruption_report` | metrics/quality/freshness của 3 trạng thái | `data/reports/corruption_report.md` — 6 mục, có `corruption_delta`/`repair_gap`/`recovery` | Hoàn thành |
 
 Không nhận ownership cho `crossref.py`, `cleaning.py`, `corruption.py`, `phase1.py`,
 `corruption_flow.py` và toàn bộ `src/retrieval/`.
@@ -55,6 +55,8 @@ Không nhận ownership cho `crossref.py`, `cleaning.py`, `corruption.py`, `phas
 | Freshness 2 trạng thái | `data/quality/freshness_report.json`, `freshness_report_corrupted.json` | `is_fresh` chuyển `true → false` | `stale_rows 0 → 2`, `max_age_days 175 → 2318` |
 | Báo cáo baseline | `data/reports/phase1_report.md` | 9 mục, mọi số đọc thẳng từ dict truyền vào | Đối chiếu tay với `baseline_metrics.json` và `baseline_quality.json` |
 | Đo impact corruption | `data/quality/corruption_impact.json` | `detection_rate = 0.8333`, `undetected_operators = ["inject_noise"]` | 6 operator trong `corruption_log.json` đều được quy về signal cụ thể |
+| Quality/freshness trạng thái repaired | `data/quality/repaired_quality.json`, `freshness_report_repaired.json` | 48 row, pass toàn bộ hard check, `is_fresh: true` — **trùng khớp baseline** | So từng trường với artifact baseline |
+| Báo cáo so sánh 3 trạng thái | `data/reports/corruption_report.md` | 6 mục, bảng delta 4 metric, phân tích theo `question_type` | Số trong `.md` đối chiếu với 3 file `*_metrics.json` |
 
 ### Một output cụ thể
 
@@ -255,6 +257,12 @@ cat data/quality/corruption_impact.json
   thực tế là **chấp nhận heuristic judge và ghi rõ trong báo cáo** — điều mà `judge_mode`
   đã tự động làm. Nếu muốn judge thật, cần tài khoản trả phí hoặc chia nhỏ số lần gọi
   theo ngày. Không được im lặng gọi kết quả hiện tại là LLM-as-a-judge.
+- **Kết quả cuối cùng:** cả ba trạng thái đều kết thúc với `judge_fallback_rate = 1.0`.
+  Điều này thực ra **giữ cho phép so sánh vẫn công bằng** — cùng một thước đo áp cho cả ba
+  trạng thái, nên `corruption_delta` và `recovery` vẫn đọc được. Cái mất là
+  `judge_accuracy` không còn là bằng chứng độc lập với `mean_token_f1`.
+  `data/reports/corruption_report.md` mục 2 ghi rõ điều này ngay dưới bảng metric, để
+  người đọc không diễn giải nhầm hai dòng judge.
 
 ## 7. Hiểu biết về luồng end-to-end
 
@@ -306,38 +314,69 @@ toàn** thay vì công bố thành công.
 
 | Metric/signal | Baseline | Corrupted | Repaired | Nhận xét của cá nhân |
 | --- | ---: | ---: | ---: | --- |
-| `retrieval_hit_rate` | 1.0 | *chưa chạy* | *chưa chạy* | Baseline hoàn hảo do thiết kế, không phải do RAG tốt — xem dưới |
-| `mean_token_f1` | 1.0 | *chưa chạy* | *chưa chạy* | Mọi sample bằng 1.0, không có sample nào dưới 1.0 |
-| `judge_accuracy` | 1.0 | *chưa chạy* | *chưa chạy* | **Không phải LLM-as-a-judge** — `judge_fallback_rate = 1.0` |
-| `mean_judge_score` | 5 | *chưa chạy* | *chưa chạy* | Giá trị heuristic suy ra từ `token_f1`, không phải điểm LLM chấm |
-| Quality checks | 7 hard pass, 2 warning | **2 hard fail**, 3 warning | *chưa chạy* | `paper_id_unique`, `summary_all_usable` |
-| Freshness status | `is_fresh: true` | `is_fresh: false` | *chưa chạy* | `stale_rows 0 → 2`, `max_age_days 175 → 2318` |
+| `retrieval_hit_rate` | 1.0000 | 0.8571 | 1.0000 | Mất 2/14 sample; phục hồi hoàn toàn (`repair_gap = 0`) |
+| `mean_token_f1` | 1.0000 | 0.7174 | 1.0000 | Tụt mạnh nhất trong 4 metric — −0.2826 |
+| `judge_accuracy` | 1.0000 | 0.7143 | 1.0000 | **Không phải LLM-as-a-judge** — `judge_fallback_rate = 1.0` ở cả 3 trạng thái |
+| `mean_judge_score` | 5 | 3.8571 | 5 | Heuristic suy ra từ `token_f1`, không mang thông tin độc lập |
+| Quality checks | 7 hard pass, 2 warning | **2 hard fail**, 3 warning | 7 hard pass, 2 warning | Repaired trùng khớp baseline từng check |
+| Freshness status | `is_fresh: true` | `is_fresh: false` | `is_fresh: true` | `stale_rows 0 → 2 → 0`; `max_age_days 175 → 2318 → 175` |
 
-**Cột Repaired chưa có số liệu.** `src/pipelines/corruption_flow.py` vẫn còn
-`NotImplementedError`, nên chưa chạy được bước repair và re-evaluate. Số liệu cột
-Corrupted ở hai dòng cuối lấy từ lần chạy `corrupt_clean_dataframe` trực tiếp (seed 42)
-chứ chưa qua `corruption_flow.py`; bốn dòng metric đầu cần re-evaluate qua Chroma nên
-chưa có. Không điền số ước lượng vào các ô này.
+Cả ba trạng thái đo trên **cùng 14 sample** của `data/eval/test_set.json`. Bằng chứng
+repair: `data/results/repair_validation.json` cho `core_content_hash_equal: true` với
+hash trùng nhau `7b3243b2308b272d`, 48 row ở cả baseline và repaired, và
+`repaired_quality_failed_checks: []`.
+
+**Lưu ý khi đọc `judge_accuracy`.** Cả ba trạng thái đều có `judge_fallback_rate = 1.0`,
+tức judge LLM không chạy lần nào. Điều này **không làm hỏng phép so sánh** — cùng một
+thước đo được dùng cho cả ba trạng thái nên chênh lệch vẫn công bằng. Nhưng nó khiến
+`judge_accuracy` và `mean_judge_score` **không phải bằng chứng độc lập**: heuristic judge
+được suy ra từ chính `token_f1`, nên hai dòng đó chỉ lặp lại thông tin của `mean_token_f1`.
+Kết luận trong báo cáo này dựa vào `retrieval_hit_rate` và `mean_token_f1`.
 
 ### Kết luận từ số liệu
 
-**Chuỗi 1 — corruption → signal → (dự kiến) metric.**
-`blank_summary` xoá trắng `summary` của 2 paper → `cleaning.py` bảo đảm mọi row có
-`summary_chars >= 40`, nên `summary_all_usable` chuyển từ pass sang **fail**
-(`unusable_summaries: 0 → 2`) và `text_for_embedding` của 2 paper đó mất phần Abstract →
-dự kiến `mean_token_f1` giảm ở các câu `summary`, vì ground truth là
-`first_sentence(summary)` nhưng metadata không còn nội dung để trả về.
+Đối chiếu từng sample với `paper_ids` trong `corruption_log.json` cho bảng quy trách
+nhiệm sau. **4/14 sample bị ảnh hưởng, và cả 4 phục hồi hoàn toàn:**
 
-**Chuỗi 2 — repair → phục hồi.** Chưa chạy được. Cơ chế đã sẵn sàng: raw snapshot 48
-record còn nguyên, `run_context.json` đã ghim `run_date` nên replay cleaning cho ra
-`age_days` giống hệt baseline, và `core_content_hash` của `cleaning.py` cho phép chứng
-minh repaired trùng baseline. Chưa có artifact thì chưa kết luận.
+| Sample | Loại | `retrieval_hit` b/c/r | `token_f1` b → c → r | Operator chạm vào paper |
+| --- | --- | :---: | --- | --- |
+| `summary-01` | summary | 1 / **0** / 1 | 1.00 → **0.04** → 1.00 | `drop_latest` |
+| `authors-01` | authors | 1 / **0** / 1 | 1.00 → **0.00** → 1.00 | `drop_latest` (cùng paper) |
+| `summary-03` | summary | 1 / 1 / 1 | 1.00 → **0.00** → 1.00 | `blank_summary` |
+| `summary-07` | summary | 1 / 1 / 1 | 1.00 → **0.00** → 1.00 | `truncate_title` |
+
+**Chuỗi 1 — corruption → quality signal → agent metric.**
+`drop_latest` xoá hẳn paper `10.1007/s10115-026-02792-4` khỏi dataset → không quality check
+nào fail (row count còn *tăng* 48→49 vì `duplicate_rows` bù vào), nhưng freshness thấy
+ngay: `latest_published 2026-12-01 → 2026-08-01`, `min_age_days −117 → 5` → document biến
+mất khỏi Chroma → **2 sample hỏi về nó (`summary-01`, `authors-01`) mất `retrieval_hit`**,
+kéo `retrieval_hit_rate` từ 1.0 xuống 0.8571.
+
+Song song, `blank_summary` xoá trắng abstract → `summary_all_usable` chuyển pass sang
+**fail** (`unusable_summaries: 0 → 2`) → `summary-03` vẫn retrieve **đúng** document nhưng
+`token_f1` về **0.00** vì metadata không còn nội dung để trả về. Đây là hai chế độ hỏng
+khác hẳn nhau: một cái mất tài liệu, một cái còn tài liệu nhưng rỗng ruột.
+
+**Chuỗi 2 — repair → quality signal phục hồi → metric phục hồi.**
+Cleaning được replay từ raw snapshot 48 record với đúng `run_date` lấy từ
+`run_context.json` → `repair_validation.json` cho `core_content_hash_equal: true`
+(hash `7b3243b2308b272d` ở cả hai phía) → `repaired_quality.json` pass lại toàn bộ 7 hard
+check và `is_fresh` trở về `true` → cả 4 metric quay về đúng giá trị baseline,
+`repair_gap = 0.0000` trên từng dòng. Phục hồi **hoàn toàn**, không phải một phần.
 
 **Corruption nào ảnh hưởng rõ nhất?**
-Xét theo số signal dịch chuyển, `stale_date` mạnh nhất: nó làm đổi 5 signal cùng lúc
-(`freshness_no_stale_rows`, `stale_rows`, `is_fresh`, `max_age_days`, `oldest_published`),
-đẩy `max_age_days` từ 175 lên **2318** ngày. Nhưng xét theo mức nguy hiểm thực tế thì
-ngược lại — xem phần dưới.
+Phải phân biệt hai câu hỏi khác nhau, vì câu trả lời **ngược nhau**:
+
+- *Ảnh hưởng lên quality signal:* `stale_date` mạnh nhất — làm đổi 5 signal cùng lúc
+  (`freshness_no_stale_rows`, `stale_rows`, `is_fresh`, `max_age_days`, `oldest_published`),
+  đẩy `max_age_days` từ 175 lên **2318** ngày.
+- *Ảnh hưởng lên agent metric:* `drop_latest` mạnh nhất — chỉ 1 paper nhưng làm hỏng
+  **2 sample** và là operator duy nhất kéo `retrieval_hit_rate` xuống. Trong khi
+  `stale_date` **không hạ một metric nào**, vì paper bị lùi ngày lại rơi vào câu hỏi loại
+  `summary` chứ không phải `date` — signal kêu rất to nhưng agent không hề bị ảnh hưởng.
+
+Bài học: signal dịch chuyển mạnh **không** đồng nghĩa với tác hại lớn. Chỉ khi nối được
+`paper_id` bị corrupt với `ground_truth_doc_ids` của sample bị tụt thì mới kết luận được.
 
 **Kết quả nào khác với kỳ vọng ban đầu?**
 
@@ -347,15 +386,37 @@ count. Thực tế 48 → **49**, vì `duplicate_rows` thêm 2 row trong khi `dr
 liệu gì" trong khi paper mới nhất đã biến mất. Chỉ freshness thấy được:
 `latest_published 2026-12-01 → 2026-08-01`, `min_age_days −117 → 5`.
 
-*Thứ hai: `inject_noise` không bị bắt, và đó là kết quả đúng.* `detection_rate = 0.8333`
-chứ không phải 1.0. Payload prompt-injection được **nối thêm** vào `summary`, nên
-`summary_chars` tăng chứ không giảm; `paper_id`, `title`, `published` nguyên vẹn. Không
-một schema check nào có thể thấy nó. Đây là ranh giới giữa **monitoring** (kiểm tập điều
-kiện đã biết) và **observability** (đủ tín hiệu để điều tra cả lỗi chưa biết trước):
-data poisoning chỉ lộ ra khi agent trả lời theo nội dung đã bị đầu độc, tức qua RAG metric,
-không qua rule-based validation.
+*Thứ hai: `inject_noise` không bị bắt bởi quality check — và cũng không bị bắt bởi metric.*
+Đây là kết quả làm tôi phải sửa lại kết luận ban đầu của mình.
 
-*Thứ ba: corruption vô tình sửa một defect.* `future_published_rows` đi **1 → 0**. Dữ liệu
+Trước khi có số liệu, tôi viết trong ghi chú rằng data poisoning "không check cấu trúc nào
+bắt được, **chỉ lộ qua RAG metric**". Vế đầu đúng: `detection_rate = 0.8333` vì payload
+prompt-injection được **nối thêm** vào cuối `summary` nên `summary_chars` tăng chứ không
+giảm, còn `paper_id`, `title`, `published` nguyên vẹn.
+
+Nhưng vế sau **sai**. `summary-02` hỏi về đúng paper bị đầu độc (`10.1111/exsy.70341`),
+và `token_f1` của nó giữ nguyên **1.00 → 1.00**. Lý do: ground truth là
+`first_sentence(summary)`, mà noise được nối vào *sau* câu đầu tiên — nên câu đầu không
+đổi và metric không thấy gì. Payload nằm trong `text_for_embedding` và đã vào Chroma, tức
+**corpus đã bị đầu độc thật**, nhưng cả 13 quality check lẫn 4 metric đánh giá đều báo
+bình thường.
+
+Kết luận đúng phải là: trong thiết lập này, data poisoning **không bị phát hiện bởi bất kỳ
+tín hiệu nào đang có**. Nó chỉ lộ ra nếu câu hỏi buộc phải đọc quá câu đầu tiên, hoặc nếu
+agent sinh câu trả lời tự do từ context thay vì lấy thẳng một trường metadata. Đây chính
+là ranh giới giữa **monitoring** (kiểm tập điều kiện đã biết trước) và **observability**
+(đủ tín hiệu để điều tra cả lỗi chưa biết trước) — và bài lab cho thấy hệ thống hiện tại
+mới dừng ở monitoring.
+
+*Thứ ba: retrieval trúng nhưng trả lời vẫn sai.* `summary-07` giữ `retrieval_hit = 1` mà
+`token_f1` về **0.00**. Paper của nó bị `truncate_title` cắt title còn 12 ký tự → exact
+lookup của `qa.py` không khớp nữa → document tụt khỏi hạng 1 dù vẫn nằm trong top-4 →
+`_extract_answer` lấy nội dung của document đứng đầu, tức document **khác**. Nếu chỉ nhìn
+`retrieval_hit_rate` thì sample này trông hoàn toàn bình thường. Đây đúng là lý do tôi tách
+báo cáo thành hai loại miss riêng (miss retrieval và miss nội dung) thay vì gộp thành một
+"trường hợp xấu nhất".
+
+*Thứ tư: corruption vô tình sửa một defect.* `future_published_rows` đi **1 → 0**. Dữ liệu
 Crossref thật có 1 paper ghi `published = 2026-12-01` trong khi `run_date = 2026-08-06` —
 ngày xuất bản trong tương lai, khiến `min_age_days = −117` và freshness report in "age_days
 nhỏ nhất = −117" kèm kết luận "tươi", vô nghĩa với người đọc. `drop_latest` xoá đúng paper
@@ -363,12 +424,21 @@ nhỏ nhất = −117" kèm kết luận "tươi", vô nghĩa với người đ�
 warning, vì đây là hành vi hợp lệ của nguồn chứ không phải corruption). Bài học: không được
 đếm số check fail rồi kết luận — chiều thay đổi cũng quan trọng.
 
-*Thứ tư: baseline hoàn hảo tuyệt đối.* `retrieval_hit_rate = 1.0`, `mean_token_f1 = 1.0`,
+*Thứ năm: baseline hoàn hảo tuyệt đối.* `retrieval_hit_rate = 1.0`, `mean_token_f1 = 1.0`,
 mọi document ở hạng 1/4. Con số này **không chứng minh RAG tốt**. Nó là hệ quả thiết kế:
 `qa.py` lấy thẳng một trường metadata, ground truth của tôi chính là trường đó, và
 exact-title lookup luôn tìm ra đúng document. Đọc theo hướng tích cực thì đây là **điều
-kiện lý tưởng cho thí nghiệm**: baseline không có nhiễu nền, nên mọi sụt giảm sau
-corruption đều quy được về corruption.
+kiện lý tưởng cho thí nghiệm**: baseline không có nhiễu nền, nên cả 4 sample tụt sau
+corruption đều quy được chính xác về operator gây ra chúng, và `repair_gap = 0` là bằng
+chứng sạch cho việc phục hồi hoàn toàn.
+
+*Thứ sáu: 3/6 operator không chạm được vào metric nào.* `inject_noise`, `stale_date` và
+`duplicate_rows` đều có paper nằm trong test set nhưng không làm tụt sample nào. Với
+`stale_date` và `duplicate_rows` thì đó là do loại câu hỏi không đụng tới trường bị hỏng.
+Điều này cho thấy **độ phủ của test set quyết định mức độ đo được của thí nghiệm**: 14 câu
+trên 8 paper không đủ để mọi operator biểu hiện ra metric. Nếu làm lại, tôi sẽ yêu cầu
+`corrupt_clean_dataframe` nhận thêm ràng buộc *mỗi operator phải chạm ít nhất một paper
+đang được hỏi bằng đúng loại câu hỏi tương ứng*.
 
 ## 9. Điều học được và hướng cải thiện
 
@@ -386,11 +456,16 @@ corruption đều quy được về corruption.
    phải ghi lại cả signal **không** đổi, nếu không báo cáo sẽ ngầm gợi ý rằng hệ thống
    quality phát hiện được mọi loại lỗi.
 
-3. **Về ảnh hưởng của data đến RAG agent:** không phải mọi corruption đều hạ mọi metric,
-   và cơ chế trả lời quyết định corruption nào gây hại. Vì `qa.py` có exact-title lookup,
-   blank summary hạ `token_f1` nhưng **không** hạ `retrieval_hit_rate`; chỉ truncate title
-   hoặc drop document mới phá được retrieval. Còn noise injection thì không tín hiệu cấu
-   trúc nào bắt được — cần semantic monitoring, không phải rule-based validation.
+3. **Về ảnh hưởng của data đến RAG agent:** cơ chế trả lời quyết định corruption nào gây
+   hại, và số liệu thật buộc tôi sửa lại hai suy đoán ban đầu. Trong 6 operator, chỉ
+   **`drop_latest`** hạ được `retrieval_hit_rate` — xoá hẳn document là cách duy nhất đẩy
+   nó ra khỏi top-4. `blank_summary` và `truncate_title` đều để `retrieval_hit = 1` mà vẫn
+   đưa `token_f1` về 0: một cái còn document nhưng rỗng nội dung, một cái làm hỏng
+   exact-title lookup khiến document tụt khỏi hạng 1 dù vẫn trong top-4. Và
+   `inject_noise` thì **không** tín hiệu nào bắt được — kể cả metric, vì ground truth chỉ
+   lấy câu đầu tiên còn noise nối vào cuối. Kết luận: `retrieval_hit_rate` một mình quá
+   thô để kết luận về chất lượng retrieval, và rule-based validation không thay thế được
+   semantic monitoring.
 
 ### Nếu có thêm thời gian
 
