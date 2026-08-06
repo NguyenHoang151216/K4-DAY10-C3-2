@@ -38,6 +38,7 @@ class Paths:
     repaired_metrics: Path
     repaired_answers: Path
     comparison_report: Path
+    run_context: Path
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,10 @@ class Settings:
     corrupted_collection_name: str
     repaired_collection_name: str
     source_api: str
+    crossref_mailto: str
+    request_timeout_seconds: int
+    request_max_retries: int
+    random_seed: int
     source_query: str
     source_filter: str
     max_results: int
@@ -106,6 +111,7 @@ def load_settings(project_dir: Path | None = None) -> Settings:
         repaired_metrics=data_dir / "results" / "repaired_metrics.json",
         repaired_answers=data_dir / "results" / "repaired_answers.json",
         comparison_report=data_dir / "reports" / "corruption_report.md",
+        run_context=data_dir / "results" / "run_context.json",
     )
 
     return Settings(
@@ -124,9 +130,16 @@ def load_settings(project_dir: Path | None = None) -> Settings:
         corrupted_collection_name="papers-corrupted",
         repaired_collection_name="papers-repaired",
         source_api="Crossref REST API",
-        source_query="agentic retrieval augmented generation large language model",
+        crossref_mailto=os.getenv("CROSSREF_MAILTO", ""),
+        request_timeout_seconds=int(os.getenv("REQUEST_TIMEOUT_SECONDS", "30")),
+        request_max_retries=int(os.getenv("REQUEST_MAX_RETRIES", "4")),
+        random_seed=int(os.getenv("RANDOM_SEED", "42")),
+        source_query=os.getenv(
+            "SOURCE_QUERY",
+            "agentic retrieval augmented generation large language model",
+        ),
         source_filter=f"from-pub-date:{source_from_date},has-abstract:true",
-        max_results=24,
+        max_results=int(os.getenv("MAX_RESULTS", "48")),
         top_k=4,
         freshness_threshold_days=freshness_threshold_days,
         refresh_source=os.getenv("REFRESH_SOURCE", "").lower() in {"1", "true", "yes"},
