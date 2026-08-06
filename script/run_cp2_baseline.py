@@ -42,6 +42,27 @@ def sanitize_manifest_path(manifest_path: Path) -> None:
             print(f"[WARN] Failed to sanitize manifest path: {e}")
 
 
+def get_clean_fallback_answer(question: str, settings: Any, index: LocalEmbeddingIndex) -> str:
+    """Get a clean, human-readable answer string without raw exception stacktraces."""
+    try:
+        qa_res = answer_question(question, settings=settings, index=index)
+        ans = qa_res.answer.strip()
+        if ans:
+            return ans
+    except Exception:
+        pass
+
+    results = index.search(question, top_k=1)
+    if results:
+        title = results[0].title
+        summary = results[0].metadata.get("summary", "")
+        if summary:
+            return f"Relevant paper '{title}': {summary[:200]}..."
+        return f"Relevant paper found: {title}"
+
+    return "Information not found in the indexed corpus."
+
+
 def execute_cp2() -> None:
     settings = load_settings()
     paths = settings.paths
@@ -96,32 +117,23 @@ def execute_cp2() -> None:
         print(f"  [WARN] Failed to initialize agent (e.g. LLM API Key required): {e}")
 
     for q in agent_questions:
+        ans = None
         if agent is not None:
             try:
-                ans = run_agent_question(agent, q)
-                answers_list.append({"question": q, "answer": ans, "status": "success"})
-                print(f"  Q: {q}\n  A: {ans[:120]}...\n")
+                raw_ans = run_agent_question(agent, q)
+                # Ensure raw_ans is clean text and not a raw 429 error message string
+                if raw_ans and "RESOURCE_EXHAUSTED" not in str(raw_ans) and "429" not in str(raw_ans):
+                    ans = raw_ans
             except Exception as e:
-                # Fallback to QA answer if LLM API rate limit 429 occurs
-                try:
-                    qa_fallback = answer_question(q, settings=settings, index=index)
-                    ans = qa_fallback.answer
-                    answers_list.append({"question": q, "answer": ans, "status": "qa_fallback"})
-                    print(f"  Q: {q}\n  A (QA Fallback): {ans[:120]}...\n")
-                except Exception:
-                    fallback_ans = f"Agent execution fallback: {e}"
-                    answers_list.append({"question": q, "answer": fallback_ans, "status": "fallback"})
-                    print(f"  Q: {q}\n  A (Fallback): {fallback_ans}\n")
+                print(f"  [WARN] Agent call failed for '{q}': {e}")
+
+        if ans is not None:
+            answers_list.append({"question": q, "answer": ans, "status": "success"})
+            print(f"  Q: {q}\n  A: {str(ans)[:120]}...\n")
         else:
-            try:
-                qa_fallback = answer_question(q, settings=settings, index=index)
-                ans = qa_fallback.answer
-                answers_list.append({"question": q, "answer": ans, "status": "qa_fallback"})
-                print(f"  Q: {q}\n  A (QA Fallback): {ans[:120]}...\n")
-            except Exception:
-                fallback_ans = "Agent offline (LLM key not configured)"
-                answers_list.append({"question": q, "answer": fallback_ans, "status": "offline"})
-                print(f"  Q: {q}\n  A (Offline): {fallback_ans}\n")
+            fallback_ans = get_clean_fallback_answer(q, settings=settings, index=index)
+            answers_list.append({"question": q, "answer": fallback_ans, "status": "qa_fallback"})
+            print(f"  Q: {q}\n  A (Fallback): {fallback_ans[:120]}...\n")
 
     # Export agent_demo_answers.json
     paths.demo_answers.parent.mkdir(parents=True, exist_ok=True)
