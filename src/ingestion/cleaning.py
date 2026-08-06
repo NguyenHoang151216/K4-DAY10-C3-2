@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import UTC, datetime
+import hashlib
 import html
+import json
 import re
 from typing import Any
 
@@ -51,6 +53,16 @@ _STRING_COLUMNS: list[str] = [
 ]
 
 _LIST_COLUMNS: list[str] = ["authors", "categories"]
+
+# Cot mang noi dung that - dung de hash so sanh baseline / corrupted / repaired.
+CORE_CONTENT_COLUMNS: list[str] = [
+    "paper_id",
+    "title",
+    "summary",
+    "published",
+    "authors_joined",
+    "categories_joined",
+]
 
 # Nguong abstract dung duoc. Ha xuong 40 neu ket qua duoi MIN_ROWS, va ghi ro
 # vao cleaning_stats de report khong ke nham la da dung nguong 80.
@@ -105,12 +117,15 @@ def _iso_date_string(series: pd.Series) -> pd.Series:
     return formatted.where(series.notna(), "").astype(str)
 
 
-def _build_text_for_embedding(row: pd.Series) -> str:
+def build_text_for_embedding(row: pd.Series | dict[str, Any]) -> str:
     """Ghep 5 nhan co dinh, giu nguyen nhan ca khi gia tri rong.
 
     Format bat bien la co y: CP5 phai rebuild cot nay sau khi corrupt, va R4
     verify bang mot phep `in` don gian. Bo dong rong se lam ca hai viec do
     tro nen phu thuoc du lieu.
+
+    Public vi `corruption.py` phai rebuild cot nay bang DUNG mot ham: baseline
+    va corrupted khac format thi phep so sanh mat cong bang.
     """
     return (
         f"Title: {row['title']}\n"
@@ -119,6 +134,33 @@ def _build_text_for_embedding(row: pd.Series) -> str:
         f"Published: {row['published']}\n"
         f"Abstract: {row['summary']}"
     )
+
+
+def row_content_hash(row: pd.Series | dict[str, Any]) -> str:
+    """Hash noi dung cot loi cua mot row.
+
+    Chi lay cot mang noi dung, KHONG lay cot dan xuat (`summary_chars`,
+    `age_days`, `text_for_embedding`) - cac cot do la ham cua cot loi nen dua
+    vao chi lam hash nhay cam voi loi lam tron ma khong them thong tin.
+    """
+    payload = json.dumps(
+        {column: str(row[column]) for column in CORE_CONTENT_COLUMNS},
+        sort_keys=True,
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def core_content_hash(df: pd.DataFrame) -> str:
+    """Hash toan dataset, khong phu thuoc thu tu row.
+
+    R1 dung o CP6 de sinh `repair_validation.json`: repaired dung bang baseline
+    thi hai hash nay bang nhau (`core_content_hash_equal: true`). Sort truoc khi
+    hash de thu tu row khong lam sai ket luan, nhung row trung lap VAN lam doi
+    hash - dung y muon, vi duplicate la mot dang corruption.
+    """
+    row_hashes = sorted(row_content_hash(row) for _, row in df.iterrows())
+    return hashlib.sha256("".join(row_hashes).encode("utf-8")).hexdigest()[:16]
 
 
 def _normalize_records(records: list[PaperRecord]) -> pd.DataFrame:
@@ -234,7 +276,7 @@ def build_clean_dataframe(records: list[PaperRecord], run_date: datetime) -> pd.
         )
 
     df["age_days"] = (run_timestamp - df["_published_dt"]).dt.days.astype(int)
-    df["text_for_embedding"] = df.apply(_build_text_for_embedding, axis=1)
+    df["text_for_embedding"] = df.apply(build_text_for_embedding, axis=1)
 
     df = df.sort_values(["_published_dt", "paper_id"], ascending=[False, True], kind="mergesort")
 
