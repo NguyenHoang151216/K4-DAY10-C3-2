@@ -1,6 +1,6 @@
 # Phase 1 Report — Baseline
 
-Sinh lúc: `2026-08-06T09:26:32.121386+00:00`
+Sinh lúc: `2026-08-06T10:15:32.189474+00:00`
 
 Mọi số liệu trong báo cáo này được đọc trực tiếp từ artifact JSON do pipeline ghi ra.
 
@@ -14,8 +14,8 @@ Mọi số liệu trong báo cáo này được đọc trực tiếp từ artifa
 | Query | agentic retrieval augmented generation large language model |
 | Filter | from-pub-date:2026-02-07,has-abstract:true |
 | max_results | 48 |
-| run_date | 2026-08-06T09:25:13.243798+00:00 |
-| Đã fetch lại nguồn | ✅ có |
+| run_date | 2026-08-06T10:15:02.626675+00:00 |
+| Đã fetch lại nguồn | ❌ không |
 | Raw records vào | 48 |
 | Clean rows ra | 48 |
 
@@ -31,15 +31,40 @@ Mọi số liệu trong báo cáo này được đọc trực tiếp từ artifa
 
 ### 2.1. Độ tin cậy của judge
 
-> ⚠️ Không đo được. Pipeline chưa gọi `enrich_metrics(bundle.summary, bundle.answers)` trước khi sinh report, nên không biết `judge_accuracy` đến từ LLM hay từ heuristic.
+| Mục | Giá trị |
+|---|---|
+| Chế độ judge | `heuristic` |
+| Số sample rơi về heuristic | 14 |
+| Tỉ lệ fallback | 1.0000 |
+
+> ⚠️ **Toàn bộ sample rơi về heuristic judge.** `judge_accuracy` và `mean_judge_score` ở trên **không phải LLM-as-a-judge** — chúng chỉ là ngưỡng đặt trên `token_f1`. Nguyên nhân: `_judge_answer` tạo client LLM mới cho từng sample, số lần gọi vượt rate limit của provider, và `except Exception` nuốt lỗi nên pipeline vẫn báo thành công.
 
 ### 2.2. Metric theo loại câu hỏi
 
-*(không có dữ liệu — pipeline chưa gọi `enrich_metrics`)*
+| Loại | Samples | Retrieval hit | Token F1 | Judge acc |
+|---|---|---|---|---|
+| `authors` | 3 | 1.0000 | 1.0000 | 1.0000 |
+| `date` | 3 | 1.0000 | 1.0000 | 1.0000 |
+| `summary` | 8 | 1.0000 | 1.0000 | 1.0000 |
 
 ### 2.3. Ví dụ hit và miss
 
-*(không có dữ liệu — pipeline chưa gọi `enrich_metrics`)*
+**Hit tốt nhất** — `summary-01` (summary)
+
+| Trường | Nội dung |
+|---|---|
+| Câu hỏi | Summarize the paper 'Reliable retrieval-augmented feature generation with large language model reasoning'. |
+| Ground truth | Abstract Feature generation can significantly enhance learning outcomes, particularly for tasks with limited data. |
+| Agent trả lời | Abstract Feature generation can significantly enhance learning outcomes, particularly for tasks with limited data. |
+| Doc ID kỳ vọng | 10.1007/s10115-026-02792-4 |
+| Doc ID retrieve được | 10.1007/s10115-026-02792-4, 10.63503/j.ijaimd.2026.233, 10.55041/isjem07213, 10.36713/epra26155 |
+| Retrieval hit | ✅ có |
+| Token F1 | 1.0000 |
+| Judge score | 5 |
+
+**Miss loại 1 — retrieval lấy nhầm document:** không có sample nào.
+
+**Miss loại 2 — retrieval đúng nhưng trả lời lệch:** không có sample nào.
 
 ## 3. Data quality
 
