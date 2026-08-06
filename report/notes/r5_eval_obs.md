@@ -87,7 +87,12 @@ Signal nào không đổi cũng phải ghi lại — đó là phần phân tích
 | 4 | `paper_id_unique` | 0 trùng |
 | 5 | `title_not_empty` | 0 rỗng |
 | 6 | `text_for_embedding_not_empty` | 0 rỗng |
-| 7 | `summary_usable_ratio` | `>= 0.90` với `summary_chars >= 80` |
+| 7 | `summary_usable_ratio` | `>= 0.90` với `summary_chars >= 40` |
+
+> Ngưỡng `MIN_SUMMARY_CHARS` để **40**, không phải 80. Lý do: `cleaning.py` hạ ngưỡng
+> xuống `SUMMARY_MIN_CHARS_RELAXED = 40` khi số row không đủ `MIN_ROWS = 24`. Nếu quality
+> check giữ 80 trong khi cleaning đã dùng 40, `summary_usable_ratio` sẽ fail trên một
+> dataset hợp lệ và cả nhóm đi tìm lỗi ở nhầm chỗ.
 
 **5 warning** (dataset còn dùng được nhưng chất lượng giảm):
 
@@ -225,9 +230,88 @@ phải đối chiếu `corruption_log.json` chứ không suy diễn từ tham s�
 
 Artifact giả (`data/quality/smoke_*.json`) đã xóa sau khi verify.
 
-### 1.4. Việc còn lại
+---
 
-- [ ] CP2 — `build_test_set` (chờ `cleaning.py` của R3 để đổi từ df giả sang `papers_clean.csv`)
-- [ ] CP3 — `generate_phase1_report` + `summarize_judge_reliability`
+## CP2 · 01:05–01:35 — `build_test_set`
+
+### 2.1. Đã hoàn thành
+
+`build_test_set(df, output_path) -> list[dict]` trong `src/evaluation/testset.py`.
+Chọn deterministic 8 paper (2 mới nhất · 2 cũ nhất · 2 abstract dài nhất · 2 ở giữa timeline),
+sinh 16 câu theo `QUESTION_PLAN` 8 summary / 3 authors / 3 date / 2 categories,
+ghi `data/eval/test_set.json` với đúng 5 trường contract.
+
+Từ CP2 trở đi test được trên schema **thật**: `cleaning.py` của R3 đã merge, nên smoke test
+dựng `PaperRecord` giả rồi cho chạy qua `build_clean_dataframe()` thay vì tự bịa DataFrame.
+Khác biệt quan trọng — nó bắt được các chi tiết mà DataFrame tự dựng bỏ sót,
+ví dụ `paper_id` bị hạ lowercase ở `cleaning.py:177`.
+
+### 2.2. Bốn quyết định thiết kế
+
+**(a) Loại thêm một nhóm title mà tài liệu contract chưa nêu.** Bẫy 5 chỉ nói về dấu `'`.
+Nhưng title được **nhúng vào mọi câu hỏi**, nên title chứa cụm từ khóa intent của
+`_extract_answer` sẽ bẻ nhánh sang trường metadata sai. Ví dụ paper tên
+*"When Was BERT Actually Trained"*: câu summary sinh ra chứa `when was` → agent trả về
+`published` thay vì `first_sentence(summary)` → `token_f1` bằng 0 mà không có dấu hiệu
+nào chỉ ra nguyên nhân. Đã loại cả 6 cụm: `who authored`, `list the authors`, `when was`,
+`publication date`, `published on`, `what categories`.
+
+**(b) Bù paper khi 4 tầng chồng lấn.** Paper mới nhất hoàn toàn có thể cũng là paper
+abstract dài nhất. Không bù thì `drop_duplicates` cắt xuống 6 paper → 14 câu, và
+không có cảnh báo nào. Đã thêm bước top-up từ `by_date` cho đủ 8.
+
+**(c) Không sinh câu hỏi khi ground truth rỗng.** Ground truth rỗng làm `token_f1` bằng 0
+và kéo metric xuống vì lý do không liên quan đến retrieval.
+
+**(d) Báo shortfall ra stdout.** Nếu một loại câu hỏi không đủ số lượng kế hoạch,
+`build_test_set` in rõ `THIEU so voi ke hoach: categories 0/2`. Im lặng ở đây sẽ khiến
+report kể nhầm là đã đánh giá đủ 4 loại câu hỏi.
+
+### 2.3. Phát hiện trên dữ liệu Crossref thật
+
+Chạy trên `data/raw/crossref_records.json` (3 record — smoke test `rows=3` của R2 ở CP0):
+
+| Quan sát | Ý nghĩa |
+|---|---|
+| `build_clean_dataframe` ra đúng 16 cột | contract khớp |
+| **Cả 3 paper có `categories_joined` rỗng** | Crossref thường không trả field `subject` |
+| `age_days` 37 / 52 / 154, `is_fresh=True` | freshness đọc đúng ngày thật |
+| Title #2 là tiếng Nga (Cyrillic) | không có title nào dính `'` hay từ khóa intent |
+| `row_count_min` fail, `categories_present_ratio` warn | quality check phản ứng đúng |
+| `build_test_set` raise với 3 document | guard hoạt động |
+
+> ⚠️ **Cảnh báo gửi cả nhóm:** nếu dữ liệu đầy đủ vẫn không có `subject`, loại câu hỏi
+> `categories` sẽ biến mất và test set còn **14 câu thay vì 16**. Không phải lỗi —
+> nhưng report bắt buộc phải ghi rõ, và số lần gọi LLM judge giảm còn 14 × 3 = 42.
+
+### 2.4. Kết quả smoke test — 16/16 PASS
+
+Kiểm tra mạnh nhất là **contract test cho Bẫy 6**: với mỗi câu hỏi sinh ra, dựng
+`SearchResult` bằng đúng 8 khóa metadata mà `index.py:54-63` đẩy vào Chroma, rồi gọi
+`_extract_answer` thật của `qa.py` và so với `ground_truth`. Cả 16 câu khớp tuyệt đối.
+Đây là bằng chứng ground truth đúng, không phải suy luận từ việc đọc code.
+
+| Nhóm | Kiểm tra |
+|---|---|
+| Schema | đúng 5 trường contract · id duy nhất · ≥ 4 sample |
+| Bẫy 6 | `_extract_answer` trả về đúng `ground_truth` cho cả 16 câu |
+| Bẫy 5 | mọi câu có title trong `'...'` · title trích xuất khớp nguyên vẹn · paper có `'` bị loại · paper có từ khóa intent bị loại |
+| Doc id | tồn tại trong dataframe · lowercase khớp `paper_id` · không có ground truth rỗng |
+| Deterministic | chạy lại giống hệt · **xáo trộn thứ tự row đầu vào vẫn giống hệt** |
+| Guard | raise khi < 8 document |
+| Suy giảm | toàn bộ paper thiếu categories → 14 câu + cảnh báo shortfall, không crash |
+
+`data/eval/test_set.json` **không** bị smoke test ghi đè — smoke ghi ra
+`data/eval/smoke_test_set.json` rồi xóa. Nếu ghi đè, `phase1.py` sẽ load test set giả
+khi `REFRESH_TEST_SET` tắt và chạy câu hỏi giả trên dữ liệu thật.
+
+### 2.5. Việc còn lại
+
+- [ ] CP3 — `generate_phase1_report` + `summarize_judge_reliability` + `summarize_by_question_type`
 - [ ] CP5 — chạy quality/freshness trên corrupted, nối corruption log với signal
 - [ ] CP6 — `generate_corruption_report`
+- [ ] Chờ R2 hoàn thiện `fetch_source_records` + `load_raw_records` để có dataset đầy đủ
+
+**Blocker cần R1 xử lý:** `phase1.py` và `corruption_flow.py` vẫn còn `NotImplementedError`.
+Không chạy được end-to-end thì không sinh được `baseline_metrics.json`, và CP3 của R5
+không có input để viết report.
