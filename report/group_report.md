@@ -6,8 +6,8 @@
 
 | Thông tin         | Nội dung                  |
 | ------------------ | -------------------------- |
-| Khóa/Lớp         | [K3 hoặc K4]              |
-| Tên nhóm         | [Tên hoặc mã nhóm]     |
+| Khóa/Lớp         | K4              |
+| Tên nhóm         | C3-1     |
 | Repository         | [Đường dẫn repository] |
 | Ngày hoàn thành | [YYYY-MM-DD]               |
 
