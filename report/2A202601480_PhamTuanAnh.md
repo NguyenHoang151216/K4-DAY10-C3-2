@@ -4,12 +4,12 @@
 
 | Thông tin | Nội dung |
 | --- | --- |
-| Họ và tên | Tuấn Anh |
+| Họ và tên | Phạm Tuấn Anh |
 | MSSV | 2A202601480 |
 | Khóa/Lớp | K4 |
 | Tên nhóm | C3-1 |
 | Vai trò chính | **R3 — Cleaning & Corruption Owner** |
-| Repository | https://github.com/NguyenHoang151216/K4-DAY10-C3-2 |
+| Repository | https://github.com/NguyenHoang151216/K4-DAY10-C3-1 |
 | Ngày hoàn thành | 2026-08-06 |
 
 ## 2. Vai trò và phạm vi công việc
@@ -147,5 +147,5 @@ Thêm **semantic drift check**: so embedding trung bình của corpus giữa 2 l
 - [x] Báo cáo không chứa `.env`, API key, token hoặc secret.
 - [x] Báo cáo này không phải bản sao nguyên văn của báo cáo nhóm hoặc thành viên khác.
 
-**Họ và tên:** Tuấn Anh — MSSV 2A202601480
+**Họ và tên:** Phạm Tuấn Anh — MSSV 2A202601480
 **Ngày xác nhận:** 2026-08-06

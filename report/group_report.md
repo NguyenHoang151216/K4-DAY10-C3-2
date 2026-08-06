@@ -13,13 +13,26 @@
 
 | STT | Họ và tên | MSSV | Vai trò chính | Module/deliverable sở hữu |
 | --: | --- | --- | --- | --- |
-| 1 | *(chờ điền)* | *(chờ điền)* | R1 — Integrator & Release Owner | `src/core/config.py`, `src/pipelines/phase1.py`, `src/pipelines/corruption_flow.py`, `script/`, `data/` |
-| 2 | *(chờ điền)* | *(chờ điền)* | R2 — Ingestion Owner | `src/ingestion/crossref.py`, `docs/KNOWLEDGE.md` |
-| 3 | Tuấn Anh | 2A202601480 | R3 — Cleaning & Corruption Owner | `src/ingestion/cleaning.py`, `src/ingestion/corruption.py` |
-| 4 | *(chờ điền)* | *(chờ điền)* | R4 — RAG & Demo Owner | `src/presentation/dashboard.py`, `script/run_dashboard.py`, `script/run_compare_demo.py` |
-| 5 | Nguyễn Kỳ Anh | *(chờ điền)* | R5 — Evaluation & Observability Owner | `src/evaluation/testset.py`, `src/observability/quality.py`, `src/observability/reporting.py` |
+| 1 | Phan Đức Anh | 2A202601554 | R1 — Integrator & Release Owner | `src/core/config.py`, `src/pipelines/phase1.py`, `src/pipelines/corruption_flow.py`, `script/`, `data/` |
+| 2 | Nguyễn Chí Hoàng | 2A202601638 | R2 — Ingestion Owner | `src/ingestion/crossref.py`, `docs/KNOWLEDGE.md` |
+| 3 | Phạm Tuấn Anh | 2A202601480 | R3 — Cleaning & Corruption Owner | `src/ingestion/cleaning.py`, `src/ingestion/corruption.py` |
+| 4 | Ngô Ngọc Quyền | *(chờ điền)* | R4 — RAG & Demo Owner | `src/presentation/dashboard.py`, `script/run_dashboard.py`, `script/run_compare_demo.py` |
+| 5 | Nguyễn Kỳ Anh | 2A202601558 | R5 — Evaluation & Observability Owner | `src/evaluation/testset.py`, `src/observability/quality.py`, `src/observability/reporting.py` |
 
-> Các ô *(chờ điền)* do từng thành viên tự bổ sung. Không điền hộ để tránh gán sai MSSV.
+Tên và MSSV lấy trực tiếp từ báo cáo cá nhân của từng người trong `report/`, không gán hộ.
+**Đủ 5/5 thành viên đã nộp báo cáo cá nhân.**
+
+| Vai | Báo cáo cá nhân |
+| --- | --- |
+| R1 | `report/individual_report_r1_PhanDucAnh.md` |
+| R2 | `report/individual_report_r2_NguyenChiHoang.md` |
+| R3 | `report/2A202601480_PhamTuanAnh.md` |
+| R4 | `report/individual_report_r4_NgoNgocQuyen.md` |
+| R5 | `report/individual_report_r3_NguyenKyAnh.md` |
+
+**Một ô còn trống:** MSSV của R4 trong `individual_report_r4_NgoNgocQuyen.md` đang ghi `R4-Group5-K4` — đó là mã vai trò chứ không phải mã số sinh viên, cần chính chủ sửa lại.
+
+> Ghi chú tên file: báo cáo của R5 (Nguyễn Kỳ Anh) đặt tên `individual_report_r3_NguyenKyAnh.md` theo cách đánh số vai trò của tài liệu BTC, khác với cách đánh số R1–R5 dùng trong repo này. Nội dung bên trong ghi đúng phạm vi Evaluation & Observability. Quy ước `<MSSV>_HoTen.md` trong `report/README.md` §1 nên được áp dụng cho cả 4 file còn lại khi có đủ MSSV.
 
 ---
 
@@ -159,4 +172,4 @@ Repair **không gọi lại Crossref**: nó replay cleaning từ `data/raw/cross
 - [x] `data/chroma/` đã gitignore và đã gỡ khỏi index
 - [x] Rebuild được clean data từ raw snapshot mà không gọi lại Crossref
 - [x] `judge_fallback_rate = 1.0` → báo cáo ghi rõ là heuristic, **không** gọi là LLM-as-a-judge
-- [ ] Đủ 5 bản `individual_report` — còn 3 bản ở dạng **bản nháp chờ chủ sở hữu ký** (xem `report/`)
+- [x] Đủ **5/5** bản `individual_report`, mỗi bản do chính chủ sở hữu viết và ký
