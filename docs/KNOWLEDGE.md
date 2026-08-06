@@ -1,8 +1,9 @@
 # KNOWLEDGE — Data Pipeline & Data Observability
 
-> Trạng thái: bản nháp khởi tạo tại CP2. R2 sở hữu cấu trúc tài liệu; mỗi role
-> bổ sung bằng chứng và phân tích thuộc module của mình. Không điền số liệu bằng
-> tay: mọi count, hash và metric cuối cùng phải lấy từ artifact trong `data/`.
+> Trạng thái: R2 đã hoàn tất bằng chứng lineage CP2. R2 sở hữu cấu trúc tài
+> liệu; mỗi role bổ sung bằng chứng và phân tích thuộc module của mình. Không
+> điền số liệu bằng tay: mọi count, hash và metric cuối cùng phải lấy từ
+> artifact trong `data/`.
 
 ## 1. Pipeline này là ETL hay ELT?
 
@@ -54,20 +55,33 @@ manifest, Chroma metadata và `ground_truth_doc_ids` của test set.
 
 | Chặng | Trạng thái | Bằng chứng hiện tại |
 |---|---|---|
-| Raw response | Có | 3 record smoke test CP0; SHA-256 `B6FCD869C17472A1DEB15C34E4D4AFF0EB693617C327DF2AD60C8823ADCC7113` |
-| Raw records | Có | SHA-256 `535D016DCE2F37A733C530C6B47CF24E90F4C7CA196A721F2D0EA338E4007D00` |
-| Clean JSON/CSV | Chưa có | Chờ baseline orchestration của R1 chạy cleaning đã merge từ R3 |
-| Embedding manifest | Chưa có | Chờ R4 build collection `papers-baseline` |
-| Chroma metadata | Chưa thể xác minh | Chưa có baseline collection trong `data/chroma/` |
+| Raw response | Có | Corpus chính thức đã fetch một lần; SHA-256 `3201C23DAD6408B24F6EDFF6BF26D98F93B8BB3528522BD4F78F833F6AFCD3B8` |
+| Raw records | Có | 48 record; SHA-256 `8407431AE30918943967574339E07BFCDF1EA37782847BE0FD587AE818DD0344` |
+| Clean JSON/CSV | Có | 48 row; không drop/dedupe; JSON SHA-256 `7B7CFB10B5A00F791AD1ABD2BFBCF0AD92595B5C7034F4D3AEB9D69B6F12BDBA` |
+| Embedding manifest | Có | 48 document; SHA-256 `EC58FEC1FD9918400FF459A6FE3DEDCE7A25BDEA156A2D78347A4CB6FAE9F116` |
+| Chroma metadata | Đã xác minh | Collection `papers-baseline` có 48 document và metadata ID khớp manifest |
 
-Raw ID quan sát tạm thời:
+ID được chọn để kiểm tra end-to-end:
 
 ```text
-10.47576/2949-1894.2026.7.7.023
+10.1007/s10115-026-02792-4
 ```
 
-ID này chưa được gọi là bằng chứng end-to-end cho đến khi cùng giá trị xuất hiện
-trong clean và `documents[].metadata.paper_id` của embedding manifest.
+Kết quả kiểm tra:
+
+```text
+raw=True
+clean=True
+index_metadata=True
+title_matches=True
+collection=papers-baseline
+collection_count=48
+chroma_match_count=1
+document_nonempty=True
+```
+
+Như vậy cùng một DOI lowercase đã đi xuyên suốt raw → clean → embedding
+manifest → Chroma metadata mà không bị đổi ID hoặc title.
 
 ### Phép kiểm tra read-only sau khi R1/R4 sinh artifact
 
@@ -184,7 +198,7 @@ khi agent giảm chất lượng ngoài các rule đã định nghĩa.
 
 ## 12. Việc cần bổ sung bằng artifact thật
 
-- [ ] R2: thay bảng lineage CP2 bằng ID từ baseline chính thức.
+- [x] R2: thay bảng lineage CP2 bằng ID từ baseline chính thức.
 - [ ] R3: điền cleaning stats và corruption IDs/parameters.
 - [ ] R4: điền Chroma count, semantic search và exact lookup evidence.
 - [ ] R5: điền quality/freshness, metric và judge fallback rate.

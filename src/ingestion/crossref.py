@@ -265,7 +265,10 @@ def _request_headers(settings: Settings) -> dict[str, str]:
     if contact:
         user_agent += f" (mailto:{contact})"
     return {
-        "Accept": "application/vnd.crossref-api-message+json",
+        # Crossref currently returns HTTP 406 for the vendor media type on
+        # some edge nodes; application/json is accepted consistently and the
+        # payload schema is unchanged.
+        "Accept": "application/json",
         "User-Agent": user_agent,
     }
 

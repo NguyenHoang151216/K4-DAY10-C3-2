@@ -1,0 +1,118 @@
+{
+  "report_name": "baseline_quality",
+  "generated_at": "2026-08-06T09:25:16.008175+00:00",
+  "row_count": 48,
+  "thresholds": {
+    "min_rows": 10,
+    "min_summary_chars": 40,
+    "min_title_chars": 15,
+    "min_summary_usable_ratio": 0.9,
+    "max_stale_ratio": 0.2,
+    "freshness_threshold_days": 180
+  },
+  "checks": [
+    {
+      "name": "required_columns_present",
+      "level": "hard",
+      "passed": true,
+      "observed": [],
+      "expected": "no missing column",
+      "detail": "11 columns required by index.py and the test set"
+    },
+    {
+      "name": "row_count_min",
+      "level": "hard",
+      "passed": true,
+      "observed": 48,
+      "expected": ">= 10 rows",
+      "detail": "too few documents makes retrieval metrics unstable"
+    },
+    {
+      "name": "paper_id_not_null",
+      "level": "hard",
+      "passed": true,
+      "observed": 0,
+      "expected": "0 empty paper_id",
+      "detail": "paper_id is the join key across raw, clean, index and test set"
+    },
+    {
+      "name": "paper_id_unique",
+      "level": "hard",
+      "passed": true,
+      "observed": 0,
+      "expected": "0 duplicate paper_id",
+      "detail": "duplicates bias top-k retrieval towards the repeated document"
+    },
+    {
+      "name": "title_not_empty",
+      "level": "hard",
+      "passed": true,
+      "observed": 0,
+      "expected": "0 empty title",
+      "detail": "exact-title lookup in qa.py fails without a title"
+    },
+    {
+      "name": "text_for_embedding_not_empty",
+      "level": "hard",
+      "passed": true,
+      "observed": 0,
+      "expected": "0 empty text_for_embedding",
+      "detail": "an empty document still gets embedded and pollutes the collection"
+    },
+    {
+      "name": "summary_usable_ratio",
+      "level": "hard",
+      "passed": true,
+      "observed": 1.0,
+      "expected": ">= 0.9",
+      "detail": "share of rows with summary_chars >= 40"
+    },
+    {
+      "name": "title_min_length",
+      "level": "warn",
+      "passed": true,
+      "observed": 0,
+      "expected": "0 title shorter than 15 chars",
+      "detail": "detects truncated titles, which break entity resolution"
+    },
+    {
+      "name": "authors_present_ratio",
+      "level": "warn",
+      "passed": true,
+      "observed": 1.0,
+      "expected": ">= 0.9",
+      "detail": "ground truth of author questions comes from this column"
+    },
+    {
+      "name": "categories_present_ratio",
+      "level": "warn",
+      "passed": false,
+      "observed": 0.0,
+      "expected": ">= 0.8",
+      "detail": "ground truth of category questions comes from this column"
+    },
+    {
+      "name": "published_iso_format",
+      "level": "warn",
+      "passed": true,
+      "observed": 0,
+      "expected": "0 value outside YYYY-MM-DD",
+      "detail": "published is stored as a string; freshness compares it lexicographically"
+    },
+    {
+      "name": "freshness_stale_ratio",
+      "level": "warn",
+      "passed": true,
+      "observed": 0.0,
+      "expected": "<= 0.2",
+      "detail": "share of rows with age_days > 180"
+    }
+  ],
+  "hard_checks_total": 7,
+  "warning_checks_total": 5,
+  "failed_checks": [],
+  "warning_checks": [
+    "categories_present_ratio"
+  ],
+  "passed": true
+}
