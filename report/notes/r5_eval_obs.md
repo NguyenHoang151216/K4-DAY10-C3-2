@@ -74,7 +74,7 @@ Ba luật kèm theo:
 
 ### 0.4. CHỐT — thiết kế quality checks (7 hard-fail + 5 warning)
 
-Nguyên tắc: mỗi corruption operator của R4 phải làm **ít nhất một** signal đổi.
+Nguyên tắc: mỗi corruption operator của R3 phải làm **ít nhất một** signal đổi.
 Signal nào không đổi cũng phải ghi lại — đó là phần phân tích ăn điểm.
 
 **7 hard-fail** (fail = dataset không dùng được):
@@ -87,12 +87,14 @@ Signal nào không đổi cũng phải ghi lại — đó là phần phân tích
 | 4 | `paper_id_unique` | 0 trùng |
 | 5 | `title_not_empty` | 0 rỗng |
 | 6 | `text_for_embedding_not_empty` | 0 rỗng |
-| 7 | `summary_usable_ratio` | `>= 0.90` với `summary_chars >= 40` |
+| 7 | `summary_all_usable` | **0 row** có `summary_chars < 40` |
 
 > Ngưỡng `MIN_SUMMARY_CHARS` để **40**, không phải 80. Lý do: `cleaning.py` hạ ngưỡng
 > xuống `SUMMARY_MIN_CHARS_RELAXED = 40` khi số row không đủ `MIN_ROWS = 24`. Nếu quality
-> check giữ 80 trong khi cleaning đã dùng 40, `summary_usable_ratio` sẽ fail trên một
-> dataset hợp lệ và cả nhóm đi tìm lỗi ở nhầm chỗ.
+> check giữ 80 trong khi cleaning đã dùng 40, check sẽ fail trên một dataset hợp lệ
+> và cả nhóm đi tìm lỗi ở nhầm chỗ.
+>
+> Check này ban đầu là tỉ lệ `>= 0.90`, đã đổi thành ngưỡng tuyệt đối ở CP4 — lý do ở §4.3.
 
 **5 warning** (dataset còn dùng được nhưng chất lượng giảm):
 
@@ -102,16 +104,16 @@ Signal nào không đổi cũng phải ghi lại — đó là phần phân tích
 | 9 | `authors_present_ratio` | `>= 0.90` |
 | 10 | `categories_present_ratio` | `>= 0.80` |
 | 11 | `published_iso_format` | 0 giá trị `< 10` ký tự |
-| 12 | `freshness_stale_ratio` | `<= 0.20` với `age_days > 180` |
+| 12 | `freshness_no_stale_rows` | **0 row** có `age_days > 180` (đổi ở CP4, §4.3) |
 
 **Ánh xạ corruption → signal dự kiến bắt được:**
 
-| Corruption (R4) | Check dự kiến đổi |
+| Corruption (R3) | Check dự kiến đổi |
 |---|---|
 | Drop latest records | `row_count_min`, `latest_published`, `min_age_days` |
-| Blank summary | `summary_usable_ratio` |
+| Blank summary | `summary_all_usable` |
 | Truncate title | `title_min_length` |
-| Stale published date | `freshness_stale_ratio`, `stale_rows`, `is_fresh` |
+| Stale published date | `freshness_no_stale_rows`, `stale_rows`, `is_fresh` |
 | Duplicate rows | `paper_id_unique` |
 | **Inject noise** | **KHÔNG check nào bắt được** → chỉ lộ qua RAG metric |
 
@@ -189,10 +191,24 @@ hoặc chấp nhận bảng quality không có cột baseline và trỏ sang `ph
 
 ### 1.1. Đã hoàn thành
 
-- `run_data_quality_checks(df, settings, report_name) -> dict` — 12 check theo thiết kế §0.4,
+- `run_data_quality_checks(df, settings, report_name) -> dict` — 13 check theo thiết kế §0.4,
   ghi `data/quality/<report_name>.json`
 - `build_freshness_report(df, settings, report_path) -> dict` — payload theo §0.5,
   ghi ra `report_path` truyền vào
+- `quality_report_name(state)` và `freshness_report_path(settings, state)` — hai helper
+  chốt tên artifact cho `baseline` / `corrupted` / `repaired`
+
+Hai helper cuối bổ sung ở CP5, đóng nốt yêu cầu *"Derive 3 path freshness trong
+`quality_dir`"* của dòng 481 phân công. Trước đó 3 path chỉ nằm trong note, nên mỗi
+người gọi có thể tự đặt tên khác nhau — lệch một chữ là bảng so sánh 3 trạng thái ở CP6
+thiếu mất một cột. R1 gọi:
+
+```python
+from observability.quality import freshness_report_path, quality_report_name
+
+quality = run_data_quality_checks(df, settings, quality_report_name("corrupted"))
+freshness = build_freshness_report(df, settings, freshness_report_path(settings, "corrupted"))
+```
 
 Giữ nguyên chữ ký theo contract đóng băng. Không sửa file của vai khác.
 
@@ -207,7 +223,12 @@ Giữ nguyên chữ ký theo contract đóng băng. Không sửa file của vai 
 
 ### 1.3. Kết quả smoke test
 
-Chạy 2026-08-06, không exception, JSON ghi được (không dính lỗi numpy serialization):
+Chạy 2026-08-06, không exception, JSON ghi được (không dính lỗi numpy serialization).
+
+> 📌 Bảng dưới là bản ghi lịch sử của lần chạy CP1, dùng tên check **cũ**:
+> `summary_usable_ratio` và `freshness_stale_ratio`. Hai check này đã đổi thành
+> `summary_all_usable` và `freshness_no_stale_rows` ở CP4 — lý do ở §4.3. Kết quả
+> kiểm chứng mới nhất, trên corruption thật và dataset cỡ thật, nằm ở §4.4.
 
 | Kịch bản | rows | passed | Hard fail | Warning | `is_fresh` |
 |---|---|---|---|---|---|
@@ -385,7 +406,7 @@ nên mọi con số trong report là số thật.
 | R1 quên `enrich_metrics` | report vẫn sinh, ghi rõ thiếu |
 | Dict rỗng | không crash |
 
-### 3.6. Việc còn lại
+### 3.6. Việc còn lại (tính tại thời điểm kết thúc CP3)
 
 - [ ] CP5 — chạy quality/freshness trên corrupted, nối corruption log với signal
 - [ ] CP6 — `generate_corruption_report` (helper `enrich_metrics` và `METRIC_KEYS` dùng lại được)
@@ -394,3 +415,263 @@ nên mọi con số trong report là số thật.
 **Blocker:** `phase1.py` và `corruption_flow.py` vẫn còn `NotImplementedError`. Không chạy
 được end-to-end thì chưa có `baseline_metrics.json` thật để đối chiếu. Toàn bộ phần R5
 đã sẵn sàng nhận input.
+
+---
+
+## CP4 · 02:00–02:15 — Nghỉ, và dự báo signal
+
+### 4.1. Ba dòng trước khi nghỉ
+
+1. Bốn hàm của R5 đã xong và test được: `build_test_set`, `run_data_quality_checks`,
+   `build_freshness_report`, `generate_phase1_report`. Còn `generate_corruption_report` (CP6).
+2. `phase1.py` của R1 đã chạy được nhưng **truyền thẳng `evaluation.summary`**, chưa gọi
+   `enrich_metrics` — chưa sửa thì report mất phần judge reliability và ví dụ hit/miss.
+3. Chưa có `data/results/baseline_metrics.json`, nên chưa đọc được hit/miss trên dữ liệu thật.
+
+### 4.2. Dự báo — làm TRƯỚC khi chạy corruption
+
+Đọc `src/ingestion/corruption.py` để lấy tham số thật thay vì đoán:
+`drop_latest` 1–2 row · `blank_summary` 2 · `inject_noise` 2–3 · `truncate_title` 1–2
+(cắt còn 12 ký tự) · `stale_date` 2–3 (lùi 2190 ngày) · `duplicate_rows` 2.
+Các operator **không chồng target lên nhau** (`_take` giữ một set `used`).
+
+| Operator | Dự báo signal đổi | Check của tôi có kêu không |
+|---|---|---|
+| `drop_latest` | `latest_published` lùi, `min_age_days` tăng | không check nào — chỉ freshness thấy |
+| `blank_summary` | `summary_chars` = 0 trên 2 row | `summary_all_usable` fail |
+| `inject_noise` | `summary_chars` **tăng** | **không check nào bắt được** |
+| `truncate_title` | title còn 12 ký tự | `title_min_length` warn |
+| `stale_date` | `age_days` +2190 | `freshness_no_stale_rows` warn, `is_fresh` → False |
+| `duplicate_rows` | 2 `paper_id` trùng | `paper_id_unique` fail |
+
+**Dự báo ngược — cái gì KHÔNG đổi, quan trọng không kém:**
+
+- `row_count_min` **không fail**. Số row sau corruption = `N − drop(1..2) + dup(2)`, tức là
+  **N hoặc N+1** — tăng lên chứ không giảm. `duplicate_rows` che mất `drop_latest` trên
+  chỉ số đếm row. Ai chỉ nhìn row count sẽ kết luận "không mất dữ liệu gì" trong khi
+  paper mới nhất đã bị xoá.
+- `inject_noise` không làm signal cấu trúc nào đổi. Đây là điểm phân tích trung tâm của
+  phần observability: **rule-based validation không phát hiện được data poisoning.**
+
+### 4.3. Dự báo làm lộ một lỗi hiệu chỉnh — đã sửa
+
+Tính thử trên dataset thật (~41 row, `max_results=48`) thay vì 15 row của CP1:
+
+| Check bản CP1 | Giá trị sau corruption | Kết quả |
+|---|---|---|
+| `summary_usable_ratio >= 0.90` | 40/42 = **0.952** | ✅ pass — **không kêu** |
+| `freshness_stale_ratio <= 0.20` | 2/42 = **0.048** | ✅ pass — **không kêu** |
+
+Hai ngưỡng tỉ lệ này được hiệu chỉnh trên dataset 15 row ở CP1. Trên dataset thật chúng
+im lặng đúng lúc cần kêu nhất, và corruption chỉ còn **1 hard check fail** — dưới mức
+Definition of Done yêu cầu ≥ 2.
+
+**Cách sửa: thay ngưỡng tỉ lệ bằng chính bất biến mà upstream đã bảo đảm.**
+
+| Check mới | Bất biến dựa vào |
+|---|---|
+| `summary_all_usable` — 0 row có `summary_chars < 40` | `cleaning.py::_apply_filters` drop mọi row dưới ngưỡng, nên dataset đã clean **phải** có 0 row như vậy |
+| `freshness_no_stale_rows` — 0 row có `age_days > 180` | `source_filter` dùng `from-pub-date:{today−180}`, nên mọi paper fetch về đều trẻ hơn ngưỡng |
+
+Đây không phải nới lỏng để corruption dễ bị bắt. Ngược lại: một dataset đã clean vi phạm
+hai bất biến trên nghĩa là **có thứ gì đó đã sửa dữ liệu sau bước cleaning** — đúng định
+nghĩa của thứ mà data quality check phải phát hiện. Ngưỡng tỉ lệ chỉ là phỏng đoán;
+bất biến là hợp đồng.
+
+Hai tỉ lệ cũ **không bị vứt đi** — chúng chuyển vào khối `signals` trong payload, cùng
+`unusable_summaries`, `duplicate_paper_ids`, `short_titles`, `stale_rows`. Check trả lời
+*"có đạt hợp đồng không"*; signals trả lời *"lệch bao nhiêu"* — cần cho bảng so sánh 3
+trạng thái ở CP6, vì một check đã fail thì fail thêm nữa vẫn chỉ là fail.
+
+`authors_present_ratio` và `categories_present_ratio` **giữ nguyên dạng tỉ lệ**: Crossref
+thật sự thiếu `subject` ở nhiều paper (§2.3), nên đó là biến thiên hợp lệ của nguồn,
+không phải bất biến.
+
+### 4.4. Đối chiếu dự báo với corruption thật — 24/24 đúng
+
+Chạy `corrupt_clean_dataframe(df, log, target_doc_ids=<từ test set>, seed=42)` thật trên
+dataset 41 row:
+
+```
+[corruption] seed=42 | 41 -> 42 rows | 6 operators | rows_changed_verified=7
+
+baseline : 41 row, passed=True,  is_fresh=True
+corrupted: 42 row, passed=False, is_fresh=False
+  hard fail: ['paper_id_unique', 'summary_all_usable']
+  warning  : ['title_min_length', 'freshness_no_stale_rows']
+```
+
+| Dự báo | Thực tế |
+|---|---|
+| baseline sạch hoàn toàn | ✅ 0 fail, 0 warning, `is_fresh=True` |
+| ≥ 2 hard check fail | ✅ đúng 2 |
+| `latest_published` lùi | ✅ `2026-07-27` → `2026-07-23` |
+| `min_age_days` tăng | ✅ `10.0` → `14.0` |
+| `max_age_days` nhảy vọt | ✅ `170.0` → `2280.0` |
+| row count **tăng** chứ không giảm | ✅ `41` → `42` |
+| noise không bị check nào bắt | ✅ 2 row nhiễm, `summary_chars` đều > 80, `paper_id`/`title`/`published` nguyên vẹn |
+
+Signals dịch chuyển: `unusable_summaries` 0→2 · `duplicate_paper_ids` 0→2 ·
+`short_titles` 0→1 · `stale_rows` 0→2.
+
+### 4.5. Mang gì trở lại sau giờ nghỉ
+
+- **Test set đã khoá.** Dùng lại nguyên `data/eval/test_set.json`, tuyệt đối không để
+  `REFRESH_TEST_SET` bật trong corruption flow. Tạo lại test set từ corrupted data là
+  phép so sánh mất hiệu lực hoàn toàn.
+- **Điểm phải kiểm ĐẦU TIÊN nếu metric không đổi ở CP5:** `corrupt_clean_dataframe` đã tự
+  chặn Bẫy 1 bằng `_verify_corruption` (raise nếu số row đổi thật ≠ số log ghi), nên
+  nguyên nhân nhiều khả năng nằm ở chỗ khác: doc bị corrupt không nằm trong
+  `ground_truth_doc_ids`, hoặc đang query nhầm `papers-baseline`.
+- **Phải so `judge_fallback_rate` giữa baseline và corrupted.** Nếu baseline chạy được LLM
+  judge còn corrupted bị rate limit, phần chênh lệch `judge_accuracy` đến từ judge chứ
+  không từ corruption. Không kiểm điều này thì kết luận ở CP6 sai mà vẫn trông hợp lý.
+
+---
+
+## CP5 · 02:15–03:15 — Đo impact trên dữ liệu thật
+
+R2 đã fetch đủ 48 record và R1 đã chạy `phase1.py`, nên CP5 chạy được trên dữ liệu thật
+mà không cần chờ `corruption_flow.py`: gọi thẳng `corrupt_clean_dataframe` rồi cho quality
+và freshness chạy trên kết quả.
+
+`run_date` lấy từ `run_context.json` (`2026-08-06T09:25:13Z`), **không** dùng
+`datetime.now()` — nếu không `age_days` lệch và mọi so sánh mất công bằng (Bẫy 4).
+
+### 5.1. Nối corruption → signal
+
+Thêm `summarize_corruption_impact()` vào `reporting.py`: ánh xạ từng operator trong
+`corruption_log.json` sang check/signal thật sự đổi, kèm mối đe dọa mà nó mô phỏng.
+Hàm trả về **cả hai chiều** — operator nào bị bắt, và operator nào **không**.
+
+```
+detection_rate = 0.8333   (5/6 operator bị bắt)
+row 48 -> 49              rows_changed_verified=7
+
+operator          n   bắt?     bằng gì
+drop_latest       1   có       latest_published, min_age_days
+blank_summary     2   có       summary_all_usable, unusable_summaries
+inject_noise      2   KHÔNG    (không gì)
+truncate_title    1   có       title_min_length, short_titles
+stale_date        2   có       freshness_no_stale_rows, stale_rows, is_fresh, max_age_days, oldest_published
+duplicate_rows    2   có       paper_id_unique, duplicate_paper_ids
+```
+
+Baseline: 48 row, pass mọi hard check. Corrupted: 49 row, **2 hard fail**
+(`paper_id_unique`, `summary_all_usable`) + 3 warning. Đạt Definition of Done.
+
+### 5.2. Kết luận trung tâm — `inject_noise` không signal nào bắt được
+
+`detection_rate = 0.8333` chứ không phải 1.0, và **con số đó là kết quả đúng, không phải
+thiếu sót**. `inject_noise` chèn payload prompt-injection vào `summary`:
+
+- `summary_chars` **tăng** chứ không giảm → `summary_all_usable` vẫn pass
+- `paper_id`, `title`, `published` nguyên vẹn → không check cấu trúc nào động đến
+- `published_iso_format`, `paper_id_unique`, `title_min_length` đều pass
+
+Không một schema check nào có thể thấy nó. Data poisoning chỉ lộ qua RAG metric khi agent
+trả lời theo nội dung đã bị đầu độc. Đây là ranh giới giữa **monitoring** (kiểm tập điều
+kiện đã biết) và **observability** (đủ tín hiệu để điều tra lỗi chưa biết trước) —
+rule-based validation không đủ, cần semantic monitoring.
+
+### 5.3. Signal KHÔNG đổi — tránh kết luận quá mức
+
+| Signal | Baseline → Corrupted | Vì sao không đổi |
+|---|---|---|
+| `row_count_min` | pass → pass | 48 → **49**, tăng lên: `duplicate_rows` (+2) che `drop_latest` (−1) |
+| `authors_present_ratio` | 1.0 → 1.0 | không operator nào động vào `authors` |
+| `categories_present_ratio` | 0.0 → 0.0 | đã bằng 0 từ baseline, không thể giảm thêm |
+| `invalid_published` | 0 → 0 | `stale_date` vẫn ghi ISO hợp lệ, chỉ lùi 6 năm |
+
+Dòng đầu là cái bẫy nguy hiểm nhất: **số row tăng sau khi mất dữ liệu.** Ai chỉ nhìn
+row count sẽ kết luận "không mất gì" trong khi paper mới nhất đã bị xoá.
+
+Và một chiều ngược đáng chú ý: `future_published_rows` đi **1 → 0**. `drop_latest` xoá
+đúng paper có ngày tương lai (nó là "mới nhất" theo `published`), nên corruption vô tình
+*sửa* một defect. Không phải mọi thay đổi signal đều theo hướng xấu — thêm một lý do
+không được đếm số check fail rồi kết luận.
+
+### 5.4. Phát hiện mới trên dữ liệu thật — ngày xuất bản trong TƯƠNG LAI
+
+Baseline có `min_age_days = **−117**`: một paper ghi `published = 2026-12-01` trong khi
+`run_date = 2026-08-06`. Crossref trả về issue date của số báo sắp phát hành.
+
+Không check nào bắt được: `published_iso_format` pass vì vẫn đúng `YYYY-MM-DD`,
+`freshness_no_stale_rows` chỉ chặn đầu trên. Freshness report in ra `age_days nhỏ nhất
+= −117` kèm kết luận **"✅ tươi"** — vô nghĩa với người đọc.
+
+Tác động thật: tầng *"2 paper mới nhất"* của `build_test_set` chọn đúng paper chưa xuất
+bản này. 1/48 row, và nó **nằm trong test set**.
+
+Đã thêm check `no_future_published` (mức **warn**, vì đây là hành vi hợp lệ của nguồn
+chứ không phải corruption) và signal `future_published_rows` / `future_rows`.
+
+### 5.5. Kết quả CP3 trên dữ liệu thật — và một blocker lớn của cả nhóm
+
+`baseline_metrics.json` thật:
+
+```json
+{"samples": 14, "retrieval_hit_rate": 1.0, "mean_token_f1": 1.0,
+ "judge_accuracy": 1.0, "mean_judge_score": 5}
+```
+
+Chạy `summarize_judge_reliability` trên `baseline_answers.json`:
+
+```
+judge_fallback_count: 14
+judge_fallback_rate : 1.0
+judge_mode          : heuristic
+```
+
+**Bẫy 3 đã xảy ra thật.** Toàn bộ 14 sample rơi về heuristic — `judge_accuracy = 1.0` và
+`mean_judge_score = 5` trong artifact **không phải LLM-as-a-judge**. Cộng với
+`agent_demo_answers.json` báo `"Agent unavailable: RuntimeError"`, cả hai chỉ về cùng một
+nguyên nhân.
+
+Chẩn đoán bằng một lần gọi API:
+
+```
+provider: gemini | model: gemini-2.5-flash | key hợp lệ
+invoke FAIL: 404 NOT_FOUND
+  "This model models/gemini-2.5-flash is no longer available to new users."
+```
+
+**API key không sai — tên model đã bị Google gỡ.** Thử 4 ứng viên theo đúng cách
+`metrics.py` gọi (`with_structured_output(JudgeVerdict)`):
+
+| Model | Kết quả |
+|---|---|
+| `gemini-flash-latest` | ✅ dùng được, tôn trọng `temperature=0.0` |
+| `gemini-3.6-flash` | ✅ dùng được, nhưng **bỏ qua** `temperature` → judge kém tái lập |
+| `gemini-3.5-flash` | ✅ dùng được |
+| `gemini-2.0-flash` | ❌ 429 hết quota |
+
+Đề xuất `LLM_MODEL=gemini-flash-latest` trong `.env`. Sửa xong thì: Rubric mục 5 (Agent,
+10 điểm) chạy lại được, và judge trở thành LLM thật thay vì heuristic.
+
+### 5.6. Baseline hoàn hảo — đọc con số cho đúng
+
+`retrieval_hit_rate = 1.0`, `mean_token_f1 = 1.0`, mọi document ở **hạng 1/4**, không
+sample nào có `token_f1 < 1.0`. Không có hit/miss nào để so sánh vì **không tồn tại miss
+ở baseline** — `summarize_retrieval_examples` trả về đúng một `best_hit`, và report ghi
+"không có sample nào" cho cả hai loại miss. Đó là kết quả trung thực, không phải thiếu dữ liệu.
+
+Nhưng phải đọc cho đúng: con số 1.0 này **không chứng minh RAG tốt**. Nó là hệ quả của
+thiết kế — `qa.py` lấy thẳng một trường metadata, ground truth của R5 chính là trường đó,
+và exact-title lookup luôn tìm ra đúng document. Baseline hoàn hảo là **điều kiện lý
+tưởng cho thí nghiệm corruption**: mọi sụt giảm ở CP5/CP6 đều quy được về corruption chứ
+không lẫn với nhiễu nền.
+
+### 5.7. Việc còn lại
+
+- [ ] CP6 — `generate_corruption_report` (dùng `summarize_corruption_impact` + `METRIC_KEYS`)
+- [ ] Chạy lại `phase1.py` sau khi sửa `LLM_MODEL`, để có judge thật và agent chạy
+- [ ] Đọc lại hit/miss sau corruption — lúc đó mới có miss để phân tích
+
+**Gửi R1 — ba việc, theo thứ tự ưu tiên:**
+
+1. Sửa `.env`: `LLM_MODEL=gemini-flash-latest`. Đang mất Rubric mục 5 và judge là giả.
+2. `phase1.py` dòng 196: gọi `enrich_metrics(evaluation.summary, evaluation.answers)`.
+   Report hiện in *"Không đo được"* ở mục 2.1–2.3, tức mất pass criteria CP3.
+3. `corruption_flow.py` dùng `quality_report_name(state)` và
+   `freshness_report_path(settings, state)` thay vì tự đặt tên file.
