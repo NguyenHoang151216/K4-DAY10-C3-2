@@ -11,6 +11,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# UTF-8 encoding fix for Windows console
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 project_root = Path(__file__).resolve().parents[1]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
@@ -34,14 +38,14 @@ def run_comparison(question: str) -> None:
     print("--------------------------------------------------------------------------------")
     if paths.embeddings_json.exists():
         try:
-            index_base = LocalEmbeddingIndex.load(paths.embeddings_json, settings)
+            index_base = LocalEmbeddingIndex.load(settings, paths.embeddings_json)
             res_base = answer_question(question, settings=settings, index=index_base)
             print(f"[Answer] {res_base.answer}")
             print(f"[Docs]   {res_base.retrieved_doc_ids}")
         except Exception as e:
             print(f"[WARN] Loi truy van Baseline: {e}")
     else:
-        print("[WARN] Chua co baseline embedding manifest (Chua chay script/run_phase1.py).")
+        print("[WARN] Chua co baseline embedding manifest.")
 
     # 2. Corrupted
     print("\n--------------------------------------------------------------------------------")
@@ -49,14 +53,14 @@ def run_comparison(question: str) -> None:
     print("--------------------------------------------------------------------------------")
     if paths.corrupted_embeddings_json.exists():
         try:
-            index_corr = LocalEmbeddingIndex.load(paths.corrupted_embeddings_json, settings)
+            index_corr = LocalEmbeddingIndex.load(settings, paths.corrupted_embeddings_json)
             res_corr = answer_question(question, settings=settings, index=index_corr)
             print(f"[Answer] {res_corr.answer}")
             print(f"[Docs]   {res_corr.retrieved_doc_ids}")
         except Exception as e:
             print(f"[WARN] Loi truy van Corrupted: {e}")
     else:
-        print("[WARN] Chua co corrupted embedding manifest (Chua chay script/run_corruption_flow.py).")
+        print("[WARN] Chua co corrupted embedding manifest.")
 
     # 3. Repaired
     print("\n--------------------------------------------------------------------------------")
@@ -64,14 +68,14 @@ def run_comparison(question: str) -> None:
     print("--------------------------------------------------------------------------------")
     if paths.repaired_embeddings_json.exists():
         try:
-            index_rep = LocalEmbeddingIndex.load(paths.repaired_embeddings_json, settings)
+            index_rep = LocalEmbeddingIndex.load(settings, paths.repaired_embeddings_json)
             res_rep = answer_question(question, settings=settings, index=index_rep)
             print(f"[Answer] {res_rep.answer}")
             print(f"[Docs]   {res_rep.retrieved_doc_ids}")
         except Exception as e:
             print(f"[WARN] Loi truy van Repaired: {e}")
     else:
-        print("[WARN] Chua co repaired embedding manifest (Chua hoan tat corruption flow).")
+        print("[WARN] Chua co repaired embedding manifest.")
 
     print("\n================================================================================\n")
 
