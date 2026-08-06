@@ -13,6 +13,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# Ensure UTF-8 output on Windows terminal
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 project_root = Path(__file__).resolve().parents[1]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
@@ -22,15 +26,16 @@ from src.core.config import load_settings
 
 REQUIRED_COLUMNS = [
     "paper_id",
-    "doi",
     "title",
     "summary",
     "authors",
     "categories",
+    "primary_category",
     "published",
     "updated",
     "abs_url",
     "pdf_url",
+    "comment",
     "authors_joined",
     "categories_joined",
     "summary_chars",
@@ -58,6 +63,7 @@ def inspect_clean_data() -> bool:
     missing_cols = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing_cols:
         print(f"[FAIL] Missing contract columns: {missing_cols}")
+        return False
     else:
         print(f"[PASS] All {len(REQUIRED_COLUMNS)} required contract columns present.")
 
@@ -71,6 +77,7 @@ def inspect_clean_data() -> bool:
 
     if nan_count > 0 or empty_count > 0:
         print(f"[FAIL] text_for_embedding has {nan_count} NaNs and {empty_count} empty strings!")
+        return False
     else:
         print("[PASS] text_for_embedding is 100% non-null and non-empty.")
 
