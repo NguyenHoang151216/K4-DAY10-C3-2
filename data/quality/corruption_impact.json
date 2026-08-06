@@ -1,0 +1,228 @@
+{
+  "seed": 42,
+  "row_count_before": 48,
+  "row_count_after": 49,
+  "rows_changed_verified": 7,
+  "operators": [
+    {
+      "type": "drop_latest",
+      "count": 1,
+      "paper_ids": [
+        "10.1007/s10115-026-02792-4"
+      ],
+      "threat": "Knowledge base stale \u2014 agent tr\u1ea3 l\u1eddi theo th\u00f4ng tin c\u0169",
+      "expected_checks": [],
+      "checks_fired": [],
+      "signals_moved": [],
+      "freshness_changed": [
+        "latest_published",
+        "min_age_days"
+      ],
+      "detected": true,
+      "detectable_by_design": true
+    },
+    {
+      "type": "blank_summary",
+      "count": 2,
+      "paper_ids": [
+        "10.25258/ijddt.16.62s.60",
+        "10.36713/epra26155"
+      ],
+      "threat": "M\u1ea5t knowledge context \u2014 agent kh\u00f4ng c\u00f2n n\u1ed9i dung \u0111\u1ec3 tr\u1ea3 l\u1eddi",
+      "expected_checks": [
+        "summary_all_usable"
+      ],
+      "checks_fired": [
+        "summary_all_usable"
+      ],
+      "signals_moved": [
+        "unusable_summaries"
+      ],
+      "freshness_changed": [],
+      "detected": true,
+      "detectable_by_design": true
+    },
+    {
+      "type": "inject_noise",
+      "count": 2,
+      "paper_ids": [
+        "10.1111/exsy.70341",
+        "10.21203/rs.3.rs-10042165/v1"
+      ],
+      "threat": "Data poisoning \u2014 prompt injection n\u1eb1m trong ch\u00ednh corpus",
+      "expected_checks": [],
+      "checks_fired": [],
+      "signals_moved": [],
+      "freshness_changed": [],
+      "detected": false,
+      "detectable_by_design": false
+    },
+    {
+      "type": "truncate_title",
+      "count": 1,
+      "paper_ids": [
+        "10.54254/2753-8818/2026.dl34055"
+      ],
+      "threat": "Entity/document resolution failure \u2014 h\u1ecfng exact-title lookup",
+      "expected_checks": [
+        "title_min_length"
+      ],
+      "checks_fired": [
+        "title_min_length"
+      ],
+      "signals_moved": [
+        "short_titles"
+      ],
+      "freshness_changed": [],
+      "detected": true,
+      "detectable_by_design": true
+    },
+    {
+      "type": "stale_date",
+      "count": 2,
+      "paper_ids": [
+        "10.1055/a-2838-5446",
+        "10.22214/ijraset.2026.82233"
+      ],
+      "threat": "Temporal reasoning sai \u2014 agent t\u01b0\u1edfng t\u00e0i li\u1ec7u c\u0169 h\u01a1n th\u1ef1c t\u1ebf",
+      "expected_checks": [
+        "freshness_no_stale_rows"
+      ],
+      "checks_fired": [
+        "freshness_no_stale_rows"
+      ],
+      "signals_moved": [
+        "stale_rows"
+      ],
+      "freshness_changed": [
+        "is_fresh",
+        "max_age_days",
+        "oldest_published"
+      ],
+      "detected": true,
+      "detectable_by_design": true
+    },
+    {
+      "type": "duplicate_rows",
+      "count": 2,
+      "paper_ids": [
+        "10.1093/sleep/zsag091.0346",
+        "10.22214/ijraset.2026.82574"
+      ],
+      "threat": "Retrieval bias \u2014 top-k k\u00e9m \u0111a d\u1ea1ng v\u00ec l\u1eb7p c\u00f9ng m\u1ed9t document",
+      "expected_checks": [
+        "paper_id_unique"
+      ],
+      "checks_fired": [
+        "paper_id_unique"
+      ],
+      "signals_moved": [
+        "duplicate_paper_ids"
+      ],
+      "freshness_changed": [],
+      "detected": true,
+      "detectable_by_design": true
+    }
+  ],
+  "checks_newly_failing": [
+    "freshness_no_stale_rows",
+    "paper_id_unique",
+    "summary_all_usable",
+    "title_min_length"
+  ],
+  "checks_still_passing": [
+    "authors_present_ratio",
+    "no_future_published",
+    "paper_id_not_null",
+    "published_iso_format",
+    "required_columns_present",
+    "row_count_min",
+    "text_for_embedding_not_empty",
+    "title_not_empty"
+  ],
+  "checks_unexplained": [],
+  "signal_deltas": {
+    "summary_usable_ratio": {
+      "baseline": 1.0,
+      "corrupted": 0.9592
+    },
+    "unusable_summaries": {
+      "baseline": 0,
+      "corrupted": 2
+    },
+    "authors_present_ratio": {
+      "baseline": 1.0,
+      "corrupted": 1.0
+    },
+    "categories_present_ratio": {
+      "baseline": 0.0,
+      "corrupted": 0.0
+    },
+    "duplicate_paper_ids": {
+      "baseline": 0,
+      "corrupted": 2
+    },
+    "short_titles": {
+      "baseline": 0,
+      "corrupted": 1
+    },
+    "stale_rows": {
+      "baseline": 0,
+      "corrupted": 2
+    },
+    "stale_ratio": {
+      "baseline": 0.0,
+      "corrupted": 0.0408
+    },
+    "invalid_published": {
+      "baseline": 0,
+      "corrupted": 0
+    },
+    "future_published_rows": {
+      "baseline": 1,
+      "corrupted": 0
+    }
+  },
+  "freshness_deltas": {
+    "latest_published": {
+      "baseline": "2026-12-01",
+      "corrupted": "2026-08-01"
+    },
+    "oldest_published": {
+      "baseline": "2026-02-12",
+      "corrupted": "2020-04-01"
+    },
+    "min_age_days": {
+      "baseline": -117.0,
+      "corrupted": 5.0
+    },
+    "max_age_days": {
+      "baseline": 175.0,
+      "corrupted": 2318.0
+    },
+    "stale_rows": {
+      "baseline": 0,
+      "corrupted": 2
+    },
+    "stale_ratio": {
+      "baseline": 0.0,
+      "corrupted": 0.0408
+    },
+    "future_rows": {
+      "baseline": 1,
+      "corrupted": 0
+    },
+    "is_fresh": {
+      "baseline": true,
+      "corrupted": false
+    },
+    "total_rows": {
+      "baseline": 48,
+      "corrupted": 49
+    }
+  },
+  "undetected_operators": [
+    "inject_noise"
+  ],
+  "detection_rate": 0.8333
+}

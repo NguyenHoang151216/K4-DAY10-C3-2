@@ -1,0 +1,106 @@
+{
+  "seed": 42,
+  "row_count_before": 48,
+  "row_count_after": 49,
+  "target_doc_ids": [
+    "10.1007/s10115-026-02792-4",
+    "10.1093/sleep/zsag091.0346",
+    "10.1111/exsy.70341",
+    "10.20944/preprints202602.0996.v1",
+    "10.21203/rs.3.rs-10012178/v1",
+    "10.22214/ijraset.2026.82233",
+    "10.36713/epra26155",
+    "10.54254/2753-8818/2026.dl34055"
+  ],
+  "operations": [
+    {
+      "type": "drop_latest",
+      "paper_ids": [
+        "10.1007/s10115-026-02792-4"
+      ],
+      "count": 1,
+      "before_hash": {
+        "10.1007/s10115-026-02792-4": "f98a94df99d33457"
+      },
+      "after_hash": {}
+    },
+    {
+      "type": "blank_summary",
+      "paper_ids": [
+        "10.25258/ijddt.16.62s.60",
+        "10.36713/epra26155"
+      ],
+      "count": 2,
+      "before_hash": {
+        "10.25258/ijddt.16.62s.60": "832367d80d8e67f4",
+        "10.36713/epra26155": "5ff49d2e297cecab"
+      },
+      "after_hash": {
+        "10.25258/ijddt.16.62s.60": "c3c4fa5fb59b5e04",
+        "10.36713/epra26155": "eaeaa871ebc5598f"
+      }
+    },
+    {
+      "type": "inject_noise",
+      "paper_ids": [
+        "10.1111/exsy.70341",
+        "10.21203/rs.3.rs-10042165/v1"
+      ],
+      "count": 2,
+      "before_hash": {
+        "10.1111/exsy.70341": "4b408d58950282b5",
+        "10.21203/rs.3.rs-10042165/v1": "2bee276d6491d4d3"
+      },
+      "after_hash": {
+        "10.1111/exsy.70341": "cb8a321cf17708a4",
+        "10.21203/rs.3.rs-10042165/v1": "9b33c3341a219116"
+      }
+    },
+    {
+      "type": "truncate_title",
+      "paper_ids": [
+        "10.54254/2753-8818/2026.dl34055"
+      ],
+      "count": 1,
+      "before_hash": {
+        "10.54254/2753-8818/2026.dl34055": "80ef05a23cdc1172"
+      },
+      "after_hash": {
+        "10.54254/2753-8818/2026.dl34055": "0229c45a5e88238f"
+      }
+    },
+    {
+      "type": "stale_date",
+      "paper_ids": [
+        "10.1055/a-2838-5446",
+        "10.22214/ijraset.2026.82233"
+      ],
+      "count": 2,
+      "before_hash": {
+        "10.22214/ijraset.2026.82233": "2bc91d65c1573dd5",
+        "10.1055/a-2838-5446": "a304fd21acf20ec9"
+      },
+      "after_hash": {
+        "10.22214/ijraset.2026.82233": "6c5d4a69c9614ddd",
+        "10.1055/a-2838-5446": "07c1a018c7cd1576"
+      }
+    },
+    {
+      "type": "duplicate_rows",
+      "paper_ids": [
+        "10.1093/sleep/zsag091.0346",
+        "10.22214/ijraset.2026.82574"
+      ],
+      "count": 2,
+      "before_hash": {
+        "10.22214/ijraset.2026.82574": "f60d9d6a894857a1",
+        "10.1093/sleep/zsag091.0346": "14df76fa6a7c0a6a"
+      },
+      "after_hash": {
+        "10.22214/ijraset.2026.82574": "f60d9d6a894857a1",
+        "10.1093/sleep/zsag091.0346": "14df76fa6a7c0a6a"
+      }
+    }
+  ],
+  "rows_changed_verified": 7
+}

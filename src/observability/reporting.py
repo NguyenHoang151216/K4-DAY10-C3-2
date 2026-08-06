@@ -192,6 +192,164 @@ def enrich_metrics(summary: dict[str, Any], answers: list[dict[str, Any]]) -> di
     }
 
 
+# --------------------------------------------------------------------------- corruption impact
+
+# Anh xa tung corruption operator sang signal duoc KY VONG bat duoc no, kem moi de
+# doa that ma no mo phong. `inject_noise` co danh sach rong la CO Y, khong phai
+# thieu sot: khong mot schema check nao bat duoc data poisoning.
+CORRUPTION_EXPECTATIONS: dict[str, dict[str, Any]] = {
+    "drop_latest": {
+        "checks": [],
+        "signals": [],
+        "freshness": ["latest_published", "min_age_days"],
+        "threat": "Knowledge base stale — agent trả lời theo thông tin cũ",
+    },
+    "blank_summary": {
+        "checks": ["summary_all_usable"],
+        "signals": ["unusable_summaries"],
+        "freshness": [],
+        "threat": "Mất knowledge context — agent không còn nội dung để trả lời",
+    },
+    "inject_noise": {
+        "checks": [],
+        "signals": [],
+        "freshness": [],
+        "threat": "Data poisoning — prompt injection nằm trong chính corpus",
+    },
+    "truncate_title": {
+        "checks": ["title_min_length"],
+        "signals": ["short_titles"],
+        "freshness": [],
+        "threat": "Entity/document resolution failure — hỏng exact-title lookup",
+    },
+    "stale_date": {
+        "checks": ["freshness_no_stale_rows"],
+        "signals": ["stale_rows"],
+        "freshness": ["is_fresh", "max_age_days", "oldest_published"],
+        "threat": "Temporal reasoning sai — agent tưởng tài liệu cũ hơn thực tế",
+    },
+    "duplicate_rows": {
+        "checks": ["paper_id_unique"],
+        "signals": ["duplicate_paper_ids"],
+        "freshness": [],
+        "threat": "Retrieval bias — top-k kém đa dạng vì lặp cùng một document",
+    },
+}
+
+_FRESHNESS_WATCHED = (
+    "latest_published",
+    "oldest_published",
+    "min_age_days",
+    "max_age_days",
+    "stale_rows",
+    "stale_ratio",
+    "future_rows",
+    "is_fresh",
+    "total_rows",
+)
+
+
+def _check_status(quality: dict[str, Any]) -> dict[str, bool]:
+    return {str(check["name"]): bool(check["passed"]) for check in quality.get("checks", [])}
+
+
+def summarize_corruption_impact(
+    corruption_log: dict[str, Any],
+    baseline_quality: dict[str, Any],
+    corrupted_quality: dict[str, Any],
+    baseline_freshness: dict[str, Any],
+    corrupted_freshness: dict[str, Any],
+) -> dict[str, Any]:
+    """Noi tung operator trong corruption log voi signal that su doi.
+
+    Tra ve ca hai chieu:
+    - `detected`: operator nao bi bat, bat boi check/signal nao
+    - `undetected_operators`: operator nao KHONG signal cau truc nao bat duoc
+
+    Chieu thu hai moi la ket luan quan trong. Bao cao chi liet ke nhung thu bi bat
+    se ngam ngam goi y rang he thong quality phat hien duoc moi loai loi du lieu -
+    trong khi thuc te co it nhat mot loai no khong the thay.
+    """
+    baseline_checks = _check_status(baseline_quality)
+    corrupted_checks = _check_status(corrupted_quality)
+    baseline_signals = baseline_quality.get("signals", {}) or {}
+    corrupted_signals = corrupted_quality.get("signals", {}) or {}
+
+    newly_failing = {
+        name
+        for name, passed in corrupted_checks.items()
+        if not passed and baseline_checks.get(name, True)
+    }
+    moved_signals = {
+        name
+        for name, value in corrupted_signals.items()
+        if name in baseline_signals and value != baseline_signals[name]
+    }
+    changed_freshness = {
+        key
+        for key in _FRESHNESS_WATCHED
+        if key in baseline_freshness and baseline_freshness.get(key) != corrupted_freshness.get(key)
+    }
+
+    operators: list[dict[str, Any]] = []
+    for operation in corruption_log.get("operations", []):
+        op_type = str(operation.get("type", ""))
+        expectation = CORRUPTION_EXPECTATIONS.get(op_type, {})
+        fired_checks = sorted(set(expectation.get("checks", [])) & newly_failing)
+        fired_signals = sorted(set(expectation.get("signals", [])) & moved_signals)
+        fired_freshness = sorted(set(expectation.get("freshness", [])) & changed_freshness)
+        operators.append(
+            {
+                "type": op_type,
+                "count": int(operation.get("count", 0)),
+                "paper_ids": list(operation.get("paper_ids", [])),
+                "threat": expectation.get("threat", ""),
+                "expected_checks": list(expectation.get("checks", [])),
+                "checks_fired": fired_checks,
+                "signals_moved": fired_signals,
+                "freshness_changed": fired_freshness,
+                "detected": bool(fired_checks or fired_signals or fired_freshness),
+                "detectable_by_design": bool(
+                    expectation.get("checks") or expectation.get("signals") or expectation.get("freshness")
+                ),
+            }
+        )
+
+    undetected = [item["type"] for item in operators if not item["detected"]]
+    unexplained = sorted(
+        newly_failing - {name for item in operators for name in item["checks_fired"]}
+    )
+
+    return {
+        "seed": corruption_log.get("seed"),
+        "row_count_before": corruption_log.get("row_count_before"),
+        "row_count_after": corruption_log.get("row_count_after"),
+        "rows_changed_verified": corruption_log.get("rows_changed_verified"),
+        "operators": operators,
+        "checks_newly_failing": sorted(newly_failing),
+        "checks_still_passing": sorted(
+            name for name, passed in corrupted_checks.items() if passed
+        ),
+        "checks_unexplained": unexplained,
+        "signal_deltas": {
+            name: {"baseline": baseline_signals.get(name), "corrupted": value}
+            for name, value in corrupted_signals.items()
+            if name in baseline_signals
+        },
+        "freshness_deltas": {
+            key: {"baseline": baseline_freshness.get(key), "corrupted": corrupted_freshness.get(key)}
+            for key in _FRESHNESS_WATCHED
+            if key in baseline_freshness
+        },
+        "undetected_operators": undetected,
+        "detection_rate": round(
+            sum(1 for item in operators if item["detected"]) / len(operators), 4
+        )
+        if operators
+        else 0.0,
+    }
+
+
 # --------------------------------------------------------------------------- section
 
 
