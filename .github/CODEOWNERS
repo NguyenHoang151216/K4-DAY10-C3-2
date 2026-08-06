@@ -1,0 +1,21 @@
+# R1 / Integrator & Release Owner
+/src/core/ @Pandaaaa333
+/src/pipelines/ @Pandaaaa333
+/src/ingestion/__init__.py @Pandaaaa333
+/script/run_phase1.py @Pandaaaa333
+/script/run_corruption_flow.py @Pandaaaa333
+/.github/ @Pandaaaa333
+/.gitignore @Pandaaaa333
+/.env.example @Pandaaaa333
+/pyproject.toml @Pandaaaa333
+/uv.lock @Pandaaaa333
+/README.md @Pandaaaa333
+/data/ @Pandaaaa333
+
+# Add the GitHub handles for R2-R5 once the team confirms them:
+# /src/ingestion/crossref.py @r2-handle
+# /src/ingestion/cleaning.py @r3-handle
+# /src/ingestion/corruption.py @r3-handle
+# /src/presentation/ @r4-handle
+# /src/evaluation/ @r5-handle
+# /src/observability/ @r5-handle
