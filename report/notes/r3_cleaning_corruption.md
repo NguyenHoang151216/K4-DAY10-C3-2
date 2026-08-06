@@ -226,10 +226,96 @@ drop_latest 1 · blank_summary 2 · inject_noise 2 · truncate_title 1 · stale_
 
 ---
 
+## CP3 / CP5 / CP6 — Dry-run toàn tuyến trên 48 record thật
+
+Chạy trước phần verify của R3 mà không chờ `corruption_flow.py` (R1) và
+`reporting.py` (R5). Toàn bộ artifact ghi vào **sandbox ngoài repo** qua
+`load_settings(<sandbox>)`, nên `data/` trong repo không bị chạm (§1.2).
+
+Không có LLM (máy thiếu `langchain`) → **không chạy agent demo và không có
+LLM-as-a-judge**. `retrieval_hit_rate` và `token_f1` tính lại theo đúng công thức
+trong `metrics.py`; đây là số tự tính, **không mạo nhận là output của
+`evaluate_pipeline`**.
+
+### Kết quả 3 trạng thái (48 record, `seed=42`, cùng một test set)
+
+| metric | baseline | corrupted | repaired | delta | recovery |
+|---|---|---|---|---|---|
+| `retrieval_hit_rate` | 1.0000 | 0.8571 | 1.0000 | **−0.1429** | **+0.1429** |
+| `mean_token_f1` | 1.0000 | 0.7174 | 1.0000 | **−0.2826** | **+0.2826** |
+| rows | 48 | 49 | 48 | | |
+| hard check fail | 0 | 1 | 0 | | |
+
+`core_content_hash`: baseline `7b3243b2308b272d` == repaired `7b3243b2308b272d` →
+**`core_content_hash_equal: true`**. Repair phục hồi **hoàn toàn**, không phải một phần.
+
+### Definition of Done — đối chiếu
+
+| Mục | Kết quả |
+|---|---|
+| 3 collection tách biệt, baseline không bị ghi đè | ✅ `papers-baseline` load lại sau khi build 2 cái kia, cho kết quả y hệt |
+| Test set giống hệt ở cả 3 trạng thái | ✅ build một lần, dùng lại |
+| Corruption làm ≥2 quality check fail | ✅ `paper_id_unique` (hard) + `title_min_length` (warn) |
+| Corruption làm ≥1 metric giảm rõ rệt | ✅ cả 2 metric đều giảm |
+| Repaired pass quality checks | ✅ 0 hard fail, không sinh warn mới so với baseline |
+| `repair_validation.json` cho `core_content_hash_equal: true` | ✅ |
+
+### Ba phát hiện từ dữ liệu thật
+
+**1. `age_days` có thể ÂM — và đó là đúng.**
+1/48 paper có `published = 2026-12-01`, tức **sau `run_date`** → `age_days = -117`.
+Crossref ghi ngày phát hành số tạp chí trước khi tới hạn. Tôi **không clip về 0**:
+clip là bóp méo dữ liệu, còn giá trị âm không phá check nào (`freshness_stale_ratio`
+chỉ đếm `age_days > 180`). Đáng lưu ý là `drop_latest` nhắm đúng paper này vì nó
+"mới nhất" — hành vi đúng.
+
+**2. `categories_present_ratio` fail vĩnh viễn, không liên quan corruption.**
+**48/48 row** không có categories (Crossref thường không trả field `subject`).
+Check này fail **giống hệt nhau ở baseline và repaired**. May là mức WARN nên không
+chặn baseline. Nhưng phải ghi rõ trong report: **đây là giới hạn của nguồn, không
+phải hệ quả của corruption** — quy nhầm là kết luận sai.
+Hệ quả kéo theo: `build_test_set` báo `categories 0/2`, test set còn **14 câu** thay
+vì 16, chỉ có 3 loại `summary` / `authors` / `date`.
+
+**3. Hai operator không sinh tín hiệu quality nào — do ngưỡng, không do lỗi.**
+
+| Tín hiệu | Quan sát | Ngưỡng | Kết quả |
+|---|---|---|---|
+| `summary_chars < 80` (blank_summary) | 2/49 = **0.041** | cho phép 0.10 | không kích hoạt |
+| `age_days > 180` (stale_date) | 2/49 = **0.041** | cho phép 0.20 | không kích hoạt |
+
+Đề bài ấn định 2–3 row mỗi operator; với corpus 48 row thì tỉ lệ luôn dưới ngưỡng.
+**Check theo tỉ lệ mù với corruption quy mô nhỏ; chỉ check đếm-không-khoan-nhượng
+(`paper_id_unique`, `title_min_length`) mới bắt được.** Cùng một bài học với noise
+injection nhưng nguyên nhân khác: noise không có check nào *về bản chất*, còn hai cái
+này có check nhưng ngưỡng quá lỏng. Đây là chỗ ăn điểm phân tích, không phải chỗ đi
+sửa tham số cho đẹp.
+
+### Trình tự đã chạy được — bàn giao cho R1 viết `corruption_flow.py`
+
+```
+1. read_json(settings.paths.run_context)            -> lay lai run_date (Bay 4)
+2. load_raw_records(settings.paths.raw_records_json)
+3. build_clean_dataframe(records, run_date)         -> baseline (verify truoc, thieu thi raise)
+4. corrupt_clean_dataframe(df, settings.paths.corruption_log,
+                           target_doc_ids=<ground_truth_doc_ids tu test_set.json>,
+                           seed=settings.random_seed)
+5. write_csv/write_json -> corrupted_clean_csv / corrupted_clean_json
+6. run_data_quality_checks(corrupted, settings, "corrupted_quality")
+   build_freshness_report(corrupted, settings, quality_dir/"freshness_report_corrupted.json")
+7. LocalEmbeddingIndex.build(corrupted, settings, settings.paths.corrupted_embeddings_json)
+8. repaired = build_clean_dataframe(load_raw_records(...), run_date)   # CUNG run_date
+9. core_content_hash(baseline) == core_content_hash(repaired) -> repair_validation.json
+10. lap lai buoc 6-7 cho repaired
+```
+`core_content_hash` đã export sẵn trong `cleaning.py`, R1 chỉ việc import.
+
+---
+
 ## Việc còn lại của R3
 
-- **CP2 (còn chặn):** review row được chọn vào test set — cần `data/eval/test_set.json`
-  của R5 · sửa lỗi schema nếu R4/R5 báo
+- **CP2 (đã gỡ chặn):** test set thật của R5 đã chạy được, corruption đã dùng
+  `ground_truth_doc_ids` thật
 - **CP5:** chạy `corrupt_clean_dataframe` trên dữ liệu thật với `target_doc_ids` thật
   từ test set của R5; đối chiếu corruption → quality check nào fail
 - **CP6:** re-run cleaning từ raw để tạo repaired dataset — **dùng đúng `run_date` từ
