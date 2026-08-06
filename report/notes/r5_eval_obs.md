@@ -569,10 +569,17 @@ thiếu sót**. `inject_noise` chèn payload prompt-injection vào `summary`:
 - `paper_id`, `title`, `published` nguyên vẹn → không check cấu trúc nào động đến
 - `published_iso_format`, `paper_id_unique`, `title_min_length` đều pass
 
-Không một schema check nào có thể thấy nó. Data poisoning chỉ lộ qua RAG metric khi agent
-trả lời theo nội dung đã bị đầu độc. Đây là ranh giới giữa **monitoring** (kiểm tập điều
-kiện đã biết) và **observability** (đủ tín hiệu để điều tra lỗi chưa biết trước) —
-rule-based validation không đủ, cần semantic monitoring.
+Không một schema check nào có thể thấy nó.
+
+> ⚠️ **Đính chính sau khi có số liệu CP6.** Đoạn trên ban đầu kết thúc bằng câu
+> *"data poisoning chỉ lộ qua RAG metric"*. Vế đó **sai**. `summary-02` hỏi đúng paper bị
+> đầu độc (`10.1111/exsy.70341`) và `token_f1` giữ nguyên **1.00 → 1.00**, vì ground truth
+> là `first_sentence(summary)` còn noise được nối vào *sau* câu đầu. Corpus đã bị đầu độc
+> thật nhưng **cả 13 quality check lẫn 4 metric đều báo bình thường**. Chi tiết ở §6.3.
+
+Đây là ranh giới giữa **monitoring** (kiểm tập điều kiện đã biết) và **observability**
+(đủ tín hiệu để điều tra lỗi chưa biết trước) — và bài lab cho thấy hệ thống hiện tại mới
+dừng ở monitoring.
 
 ### 5.3. Signal KHÔNG đổi — tránh kết luận quá mức
 
@@ -662,16 +669,110 @@ và exact-title lookup luôn tìm ra đúng document. Baseline hoàn hảo là *
 tưởng cho thí nghiệm corruption**: mọi sụt giảm ở CP5/CP6 đều quy được về corruption chứ
 không lẫn với nhiễu nền.
 
-### 5.7. Việc còn lại
+### 5.7. Việc còn lại (tính tại thời điểm kết thúc CP5)
 
-- [ ] CP6 — `generate_corruption_report` (dùng `summarize_corruption_impact` + `METRIC_KEYS`)
-- [ ] Chạy lại `phase1.py` sau khi sửa `LLM_MODEL`, để có judge thật và agent chạy
-- [ ] Đọc lại hit/miss sau corruption — lúc đó mới có miss để phân tích
+- [x] CP6 — `generate_corruption_report`
+- [x] Chạy lại `corruption_flow.py` để có đủ 3 trạng thái
+- [ ] Judge LLM thật — xem §6.5, không giải được trong khuôn khổ free tier
 
-**Gửi R1 — ba việc, theo thứ tự ưu tiên:**
+---
 
-1. Sửa `.env`: `LLM_MODEL=gemini-flash-latest`. Đang mất Rubric mục 5 và judge là giả.
-2. `phase1.py` dòng 196: gọi `enrich_metrics(evaluation.summary, evaluation.answers)`.
-   Report hiện in *"Không đo được"* ở mục 2.1–2.3, tức mất pass criteria CP3.
-3. `corruption_flow.py` dùng `quality_report_name(state)` và
-   `freshness_report_path(settings, state)` thay vì tự đặt tên file.
+## CP6 · 03:15–04:00 — Repair, comparison, review
+
+### 6.1. Đã hoàn thành
+
+`generate_corruption_report` → `data/reports/corruption_report.md`, 6 mục:
+bảng so sánh 3 trạng thái · độ tin cậy judge · phân tích theo `question_type` ·
+quality corrupted vs repaired · freshness corrupted vs repaired · kết luận + giới hạn.
+
+Ba delta theo đúng định nghĩa phân công:
+
+| Tên | Công thức | Ý nghĩa |
+|---|---|---|
+| `corruption_delta` | corrupted − baseline | corruption làm hỏng bao nhiêu |
+| `recovery` | repaired − corrupted | bước repair kéo lại được bao nhiêu |
+| `repair_gap` | repaired − baseline | sau khi sửa còn lệch baseline bao nhiêu |
+
+### 6.2. Kết quả — phục hồi hoàn toàn
+
+| Metric | Baseline | Corrupted | Repaired | `corruption_delta` | `repair_gap` |
+|---|---:|---:|---:|---:|---:|
+| `retrieval_hit_rate` | 1.0000 | 0.8571 | 1.0000 | −0.1429 | **0.0000** |
+| `mean_token_f1` | 1.0000 | 0.7174 | 1.0000 | −0.2826 | **0.0000** |
+| `judge_accuracy` | 1.0000 | 0.7143 | 1.0000 | −0.2857 | **0.0000** |
+| `mean_judge_score` | 5 | 3.8571 | 5 | −1.1429 | **0.0000** |
+
+Quality: baseline và repaired **giống hệt nhau** — 48 row, pass toàn bộ 7 hard check,
+cùng 2 warning (`categories_present_ratio`, `no_future_published`). Freshness cũng trùng
+khớp từng trường. `repair_validation.json` cho `core_content_hash_equal: true` với hash
+`7b3243b2308b272d` ở cả hai phía.
+
+Điều kiện làm nên kết quả này: raw snapshot bất biến còn nguyên, và cleaning được replay
+bằng **đúng `run_date`** lấy từ `run_context.json`. Nếu `age_days` được tính lại bằng
+`datetime.now()` thì hash sẽ khác dù logic hoàn toàn đúng.
+
+### 6.3. Quy trách nhiệm từng sample — và một đính chính
+
+Đối chiếu `paper_ids` trong `corruption_log.json` với từng sample trong 3 file answers.
+**4/14 sample bị ảnh hưởng, cả 4 phục hồi hoàn toàn:**
+
+| Sample | `retrieval_hit` b/c/r | `token_f1` b → c → r | Operator |
+|---|:---:|---|---|
+| `summary-01` | 1 / **0** / 1 | 1.00 → 0.04 → 1.00 | `drop_latest` |
+| `authors-01` | 1 / **0** / 1 | 1.00 → 0.00 → 1.00 | `drop_latest` (cùng paper) |
+| `summary-03` | 1 / 1 / 1 | 1.00 → **0.00** → 1.00 | `blank_summary` |
+| `summary-07` | 1 / 1 / 1 | 1.00 → **0.00** → 1.00 | `truncate_title` |
+
+Ba điều rút ra, đều **ngược với suy đoán ban đầu của tôi**:
+
+**(a) Chỉ `drop_latest` hạ được `retrieval_hit_rate`.** Ở CP2 tôi ghi rằng truncate title
+phá exact lookup nên sẽ hạ retrieval. Thực tế `summary-07` giữ `retrieval_hit = 1`:
+title bị cắt làm `index.lookup()` trượt, document tụt khỏi hạng 1 nhưng **vẫn nằm trong
+top-4**, nên `retrieval_hit` vẫn tính là trúng. Cái hỏng là `_extract_answer` lấy nội dung
+của document đứng đầu — một document khác — nên `token_f1` về 0. Xoá hẳn document là cách
+duy nhất đẩy nó ra khỏi top-k.
+
+**(b) `inject_noise` không bị metric bắt được, không chỉ không bị check bắt.** Đây là đính
+chính cho §5.2. `summary-02` hỏi đúng paper bị đầu độc và `token_f1` giữ nguyên
+**1.00 → 1.00**, vì ground truth là `first_sentence(summary)` còn noise nối vào *sau* câu
+đầu. Payload đã vào `text_for_embedding` và đã nạp vào Chroma — corpus **đã bị đầu độc
+thật** — nhưng cả 13 quality check lẫn 4 metric đều báo bình thường. Nó chỉ lộ ra nếu câu
+hỏi buộc đọc quá câu đầu, hoặc nếu agent sinh câu trả lời tự do từ context.
+
+**(c) 3/6 operator có paper trong test set nhưng không làm tụt sample nào.**
+`inject_noise`, `stale_date`, `duplicate_rows`. Với `stale_date` là vì paper bị lùi ngày
+lại rơi vào câu hỏi loại `summary` chứ không phải `date` — signal kêu rất to (5 tín hiệu
+đổi, `max_age_days` 175 → 2318) nhưng agent không hề bị ảnh hưởng. **Signal dịch chuyển
+mạnh không đồng nghĩa với tác hại lớn.** Độ phủ của test set quyết định mức đo được của
+thí nghiệm; 14 câu trên 8 paper không đủ để mọi operator biểu hiện ra metric.
+
+### 6.4. Giới hạn chữ ký hàm — đã lường trước từ CP0
+
+`generate_corruption_report` nhận `corrupted_quality` và `repaired_quality` nhưng **không**
+nhận `baseline_quality` (đã nêu ở §0.6). Hệ quả thấy rõ trong report mục 4: dòng
+`no_future_published` hiện `corrupted ✅ / repaired ❌`, đọc thoáng qua dễ tưởng repair làm
+tệ đi. Thực ra baseline cũng ❌ ở check đó — paper ngày tương lai vốn có trong nguồn, và
+`drop_latest` tình cờ xoá nó nên corrupted mới "sạch" hơn.
+
+Không đổi chữ ký (contract đóng băng). Thay vào đó report tự chèn ghi chú dưới bảng, chỉ
+người đọc sang `phase1_report.md` để đối chiếu baseline. Nếu làm lại từ đầu, tôi sẽ đề
+xuất thêm `baseline_quality` ngay từ CP0 thay vì vá bằng ghi chú.
+
+### 6.5. Tổng kết vai R5
+
+| CP | Deliverable | Trạng thái |
+|---|---|---|
+| CP0 | 4 template câu hỏi, quy tắc ground truth, thiết kế 13 check | ✅ |
+| CP1 | `run_data_quality_checks`, `build_freshness_report` (+2 helper path) | ✅ |
+| CP2 | `build_test_set` — 14 câu / 8 paper, deterministic | ✅ |
+| CP3 | `generate_phase1_report` + 4 helper đo độ tin cậy | ✅ |
+| CP4 | Dự báo signal, đối chiếu 24/24 đúng | ✅ |
+| CP5 | `summarize_corruption_impact`, `detection_rate = 0.8333` | ✅ |
+| CP6 | `generate_corruption_report`, `repair_gap = 0` trên cả 4 metric | ✅ |
+
+**Việc duy nhất không giải được:** judge LLM. Cả 3 trạng thái đều
+`judge_fallback_rate = 1.0`. Nguyên nhân gốc đã xác định (model `gemini-2.5-flash` bị gỡ,
+rồi free tier chỉ cho 20 request/ngày/model trong khi cần 42), nhưng không khắc phục được
+trong khuôn khổ tài khoản miễn phí. Phép so sánh **vẫn công bằng** vì cùng một thước đo
+áp cho cả ba trạng thái; cái mất là `judge_accuracy` không còn là bằng chứng độc lập với
+`mean_token_f1`. `corruption_report.md` mục 2 ghi rõ điều này ngay dưới bảng metric.
