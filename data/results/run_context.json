@@ -1,0 +1,9 @@
+{
+  "run_date": "2026-08-06T08:36:57.881658+00:00",
+  "source_query": "agentic retrieval augmented generation large language model",
+  "source_filter": "from-pub-date:2026-02-07,has-abstract:true",
+  "max_results": 48,
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "top_k": 4,
+  "freshness_threshold_days": 180
+}
