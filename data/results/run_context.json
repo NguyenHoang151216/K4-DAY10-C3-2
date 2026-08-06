@@ -1,5 +1,5 @@
 {
-  "run_date": "2026-08-06T10:15:02.626675+00:00",
+  "run_date": "2026-08-06T13:15:35.322351+00:00",
   "source_query": "agentic retrieval augmented generation large language model",
   "source_filter": "from-pub-date:2026-02-07,has-abstract:true",
   "max_results": 48,

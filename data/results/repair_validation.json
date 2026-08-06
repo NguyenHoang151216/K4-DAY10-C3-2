@@ -1,0 +1,11 @@
+{
+  "baseline_core_content_hash": "7b3243b2308b272d",
+  "repaired_core_content_hash": "7b3243b2308b272d",
+  "core_content_hash_equal": true,
+  "baseline_rows": 48,
+  "corrupted_rows": 49,
+  "repaired_rows": 48,
+  "run_date_replayed": "2026-08-06T13:15:35.322351+00:00",
+  "raw_snapshot": "data/raw/crossref_records.json",
+  "repaired_quality_failed_checks": []
+}

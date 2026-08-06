@@ -8,10 +8,10 @@ from typing import Any
 import pandas as pd
 
 from core.config import Settings, load_settings
-from core.utils import read_json, write_csv, write_json
+from core.utils import normalize_manifest_persist_path, read_json, write_csv, write_json
 
 
-TOTAL_STEPS = 8
+TOTAL_STEPS = 13
 CORE_METRICS = (
     "retrieval_hit_rate",
     "mean_token_f1",
@@ -176,6 +176,9 @@ def main() -> None:
         settings,
         settings.paths.corrupted_embeddings_json,
     )
+    normalize_manifest_persist_path(
+        settings.paths.corrupted_embeddings_json, settings.paths.project_dir
+    )
     if corrupted_index.collection_name != settings.corrupted_collection_name:
         raise RuntimeError(
             f"Expected collection {settings.corrupted_collection_name!r}, got "
@@ -264,5 +267,110 @@ def main() -> None:
         "CP5 completed: "
         f"rows={len(baseline_df)}->{len(corrupted_df)}, "
         f"quality_failures={failed_quality_checks}, metric_declines={declines}",
+        flush=True,
+    )
+
+    # ------------------------------------------------------------------ CP6: repair
+    _log_step(9, "Repair: replay cleaning from the immutable raw snapshot")
+    from datetime import datetime
+
+    from ingestion.cleaning import build_clean_dataframe, core_content_hash
+    from ingestion.crossref import load_raw_records
+
+    run_context = read_json(settings.paths.run_context)
+    replay_run_date = datetime.fromisoformat(str(run_context["run_date"]))
+
+    # Bay 4: phase1 va corruption_flow la hai tien trinh rieng. Dung
+    # datetime.now() o day thi `age_days` lech va hash baseline vs repaired
+    # LUON fail du code hoan toan dung. run_date bat buoc doc tu run_context.json.
+    raw_records = load_raw_records(settings.paths.raw_records_json)
+    repaired_df = build_clean_dataframe(raw_records, replay_run_date)
+
+    _log_step(10, "Write repaired clean CSV and JSON")
+    write_csv(repaired_df, settings.paths.repaired_clean_csv)
+    write_json(settings.paths.repaired_clean_json, repaired_df.to_dict(orient="records"))
+
+    _log_step(11, "Build isolated repaired collection and evaluate on the frozen test set")
+    from retrieval.index import LocalEmbeddingIndex
+
+    repaired_index = LocalEmbeddingIndex.build(
+        repaired_df,
+        settings,
+        settings.paths.repaired_embeddings_json,
+    )
+    normalize_manifest_persist_path(
+        settings.paths.repaired_embeddings_json, settings.paths.project_dir
+    )
+    repaired_bundle = evaluate_pipeline(
+        settings,
+        repaired_index,
+        settings.paths.eval_testset,
+        settings.paths.repaired_metrics,
+        settings.paths.repaired_answers,
+    )
+    repaired_metrics = enrich_metrics(repaired_bundle.summary, repaired_bundle.answers)
+    write_json(settings.paths.repaired_metrics, repaired_metrics)
+
+    _log_step(12, "Run repaired quality and freshness reports")
+    repaired_quality = run_data_quality_checks(repaired_df, settings, "repaired_quality")
+    repaired_freshness_path = settings.paths.quality_dir / "freshness_report_repaired.json"
+    repaired_freshness = build_freshness_report(
+        repaired_df,
+        settings,
+        repaired_freshness_path,
+    )
+
+    _log_step(13, "Validate repair and write the comparison report")
+    baseline_hash = core_content_hash(baseline_df)
+    repaired_hash = core_content_hash(repaired_df)
+    hash_equal = baseline_hash == repaired_hash
+    repair_validation = {
+        "baseline_core_content_hash": baseline_hash,
+        "repaired_core_content_hash": repaired_hash,
+        "core_content_hash_equal": hash_equal,
+        "baseline_rows": int(len(baseline_df)),
+        "corrupted_rows": int(len(corrupted_df)),
+        "repaired_rows": int(len(repaired_df)),
+        "run_date_replayed": str(run_context["run_date"]),
+        # Path tuong doi so voi project_dir: artifact duoc commit vao repo nen
+        # absolute path se lo cay thu muc cua may sinh ra no va khong tai lap duoc.
+        "raw_snapshot": settings.paths.raw_records_json.relative_to(
+            settings.paths.project_dir
+        ).as_posix(),
+        "repaired_quality_failed_checks": list(repaired_quality.get("failed_checks", [])),
+    }
+    write_json(settings.paths.project_dir / "data" / "results" / "repair_validation.json", repair_validation)
+
+    from observability.reporting import generate_corruption_report
+
+    generate_corruption_report(
+        settings.paths.comparison_report,
+        baseline_metrics,
+        corrupted_metrics,
+        repaired_metrics,
+        corrupted_quality,
+        repaired_quality,
+        corrupted_freshness,
+        repaired_freshness,
+    )
+
+    # Repair phai chung minh duoc bang hash, khong phai bang "da chay xong".
+    if not hash_equal:
+        raise RuntimeError(
+            "Repaired data does not match the baseline core content hash "
+            f"({repaired_hash} != {baseline_hash}). Check that cleaning replayed with the "
+            "run_date from run_context.json and that the raw snapshot is the one used for "
+            "the baseline."
+        )
+
+    _verify_hashes_unchanged(baseline_hashes)
+    if client.get_collection(settings.baseline_collection_name).count() != baseline_collection_count:
+        raise RuntimeError("The papers-baseline collection was mutated during CP6.")
+
+    print(
+        "CP6 completed: "
+        f"rows={len(corrupted_df)}->{len(repaired_df)}, "
+        f"core_content_hash_equal={hash_equal}, "
+        f"repaired_quality_failures={list(repaired_quality.get('failed_checks', []))}",
         flush=True,
     )
